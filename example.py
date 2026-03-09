@@ -1,180 +1,287 @@
 import asyncio
 import hashlib
 import hmac
+import json
 import logging
 import random
+import sys
 import uuid
+from datetime import datetime, timezone
 from optparse import OptionParser
 
 import aiohttp
 
+import ms.protocol_pb2 as pb
 from ms.base import MSRPCChannel
 from ms.rpc import Lobby
-import ms.protocol_pb2 as pb
-from google.protobuf.json_format import MessageToJson
-
-
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s %(levelname)s: %(message)s", datefmt="%Y-%m-%d %H:%M:%S"
-)
 
 MS_HOST = "https://game.maj-soul.com"
 
 
-async def main():
-    """
-    Login to the CN server with username and password and get latest 30 game logs.
-    """
-    parser = OptionParser()
-    parser.add_option("-u", "--username", type="string", help="Your account name.")
-    parser.add_option("-p", "--password", type="string", help="Your account password.")
-    parser.add_option("-l", "--log", type="string", help="Your log UUID for load.")
+def setup_logging(log_file=None, quiet=False):
+    log_format = "%(asctime)s %(levelname)s: %(message)s"
+    date_format = "%Y-%m-%d %H:%M:%S"
 
-    opts, _ = parser.parse_args()
-    username = opts.username
-    password = opts.password
-    log_uuid = opts.log
+    handlers = []
+    console_level = logging.WARNING if quiet else logging.INFO
+    console_handler = logging.StreamHandler(sys.stdout)
+    console_handler.setLevel(console_level)
+    handlers.append(console_handler)
 
-    if not username or not password:
-        parser.error("Username or password cant be empty")
+    if log_file:
+        file_handler = logging.FileHandler(log_file, encoding="utf-8")
+        file_handler.setLevel(logging.DEBUG)
+        handlers.append(file_handler)
 
-    lobby, channel, version_to_force = await connect()
-    await login(lobby, username, password, version_to_force)
-
-    if not log_uuid:
-        game_logs = await load_game_logs(lobby)
-        logging.info("Found {} records".format(len(game_logs)))
-    else:
-        game_log = await load_and_process_game_log(lobby, log_uuid, version_to_force)
-        logging.info("game {} result : \n{}".format(game_log.head.uuid, game_log.head.result))
-
-    await channel.close()
+    logging.basicConfig(
+        level=logging.DEBUG,
+        format=log_format,
+        datefmt=date_format,
+        handlers=handlers,
+        force=True,
+    )
 
 
 async def connect():
-    async with aiohttp.ClientSession() as session:
-        async with session.get("{}/1/version.json".format(MS_HOST)) as res:
-            version = await res.json()
-            logging.info(f"Version: {version}")
-            version = version["version"]
+    timeout = aiohttp.ClientTimeout(total=10)
+    async with aiohttp.ClientSession(timeout=timeout) as session:
+        async with session.get(f"{MS_HOST}/1/version.json") as res:
+            version = (await res.json())["version"]
             version_to_force = version.replace(".w", "")
 
-        async with session.get("{}/1/v{}/config.json".format(MS_HOST, version)) as res:
+        async with session.get(f"{MS_HOST}/1/v{version}/config.json") as res:
             config = await res.json()
-            logging.info(f"Config: {config}")
 
-            url = config["ip"][0]["region_urls"][1]["url"]
+            route_urls = []
+            for entry in config.get("ip", []):
+                for field in ("region_urls", "gateways"):
+                    for route in entry.get(field, []):
+                        if isinstance(route, dict) and route.get("url"):
+                            route_urls.append(route["url"])
 
-        async with session.get(url + "?service=ws-gateway&protocol=ws&ssl=true") as res:
-            servers = await res.json()
-            logging.info(f"Available servers: {servers}")
+            if not route_urls:
+                raise RuntimeError(f"No route URLs found in config ip section: {config.get('ip')}")
 
-            servers = servers["servers"]
-            server = random.choice(servers)
-            endpoint = "wss://{}/gateway".format(server)
+            random.shuffle(route_urls)
 
-    logging.info(f"Chosen endpoint: {endpoint}")
+        endpoint = None
+        for url in route_urls:
+            try:
+                async with session.get(url + "?service=ws-gateway&protocol=ws&ssl=true") as res:
+                    servers = await res.json()
+                    server_candidates = servers.get("servers", []) if isinstance(servers, dict) else []
+                    if not server_candidates:
+                        raise RuntimeError("No websocket servers returned")
+
+                    server = random.choice(server_candidates)
+                    if isinstance(server, dict):
+                        server = server.get("url") or server.get("host") or server.get("server")
+                    if not server:
+                        raise RuntimeError("Invalid server entry")
+
+                    if server.startswith("ws://") or server.startswith("wss://"):
+                        endpoint = server.rstrip("/")
+                    elif server.startswith("http://") or server.startswith("https://"):
+                        endpoint = server.replace("https://", "wss://").replace("http://", "ws://").rstrip("/")
+                    else:
+                        endpoint = f"wss://{server}"
+
+                    if not endpoint.endswith("/gateway"):
+                        endpoint = endpoint + "/gateway"
+                    break
+            except Exception:
+                endpoint = url.replace("https://", "wss://").replace("http://", "ws://").rstrip("/") + "/gateway"
+                break
+
+        if not endpoint:
+            raise RuntimeError("Unable to resolve websocket endpoint")
+
     channel = MSRPCChannel(endpoint)
-
     lobby = Lobby(channel)
-
     await channel.connect(MS_HOST)
-    logging.info("Connection was established")
-
     return lobby, channel, version_to_force
 
 
 async def login(lobby, username, password, version_to_force):
-    logging.info("Login with username and password")
-
-    uuid_key = str(uuid.uuid1())
-
     req = pb.ReqLogin()
     req.account = username
     req.password = hmac.new(b"lailai", password.encode(), hashlib.sha256).hexdigest()
     req.device.is_browser = True
-    req.random_key = uuid_key
+    req.random_key = str(uuid.uuid1())
     req.gen_access_token = True
     req.client_version_string = f"web-{version_to_force}"
     req.currency_platforms.append(2)
 
     res = await lobby.login(req)
-    token = res.access_token
-    if not token:
-        logging.error("Login Error:")
-        logging.error(res)
-        return False
+    if not res.access_token:
+        raise RuntimeError(
+            f"Login failed: code={res.error.code}, u32={list(res.error.u32_params)}, str={list(res.error.str_params)}"
+        )
 
-    return True
-
-
-async def load_game_logs(lobby):
-    logging.info("Loading game logs")
-
-    records = []
-    current = 1
-    step = 30
-    req = pb.ReqGameRecordList()
-    req.start = current
-    req.count = step
-    res = await lobby.fetch_game_record_list(req)
-    records.extend([r.uuid for r in res.record_list])
-
-    return records
+    return res.account_id
 
 
-async def load_and_process_game_log(lobby, uuid, version_to_force):
-    logging.info("Loading game log")
+async def resolve_account_id_by_nickname(lobby, nickname):
+    req = pb.ReqSearchAccountByPattern()
+    req.search_next = False
+    req.pattern = nickname
+    res = await lobby.search_account_by_pattern(req)
 
-    req = pb.ReqGameRecord()
-    req.game_uuid = uuid
-    req.client_version_string = f"web-{version_to_force}"
-    res = await lobby.fetch_game_record(req)
+    if res.error.code:
+        raise RuntimeError(f"search_account_by_pattern failed: code={res.error.code}")
 
-    record_wrapper = pb.Wrapper()
-    record_wrapper.ParseFromString(res.data)
+    candidates = list(res.match_accounts)
+    if res.decode_id and res.decode_id not in candidates:
+        candidates.insert(0, res.decode_id)
 
-    game_details = pb.GameDetailRecords()
-    game_details.ParseFromString(record_wrapper.data)
+    if not candidates:
+        raise RuntimeError(f"No account found for nickname pattern: {nickname}")
 
-    game_records_count = len(game_details.records)
-    logging.info("Found {} game records".format(game_records_count))
+    # Return exact nickname match first, fallback to first candidate.
+    for candidate_id in candidates[:20]:
+        id_req = pb.ReqSearchAccountById()
+        id_req.account_id = candidate_id
+        id_res = await lobby.search_account_by_id(id_req)
+        if id_res.error.code:
+            continue
+        if id_res.player.nickname == nickname:
+            return candidate_id
 
-    round_record_wrapper = pb.Wrapper()
-    is_show_new_round_record = False
-    is_show_discard_tile = False
-    is_show_deal_tile = False
-
-    for i in range(0, game_records_count):
-        round_record_wrapper.ParseFromString(game_details.records[i])
-
-        if round_record_wrapper.name == ".lq.RecordNewRound" and not is_show_new_round_record:
-            logging.info("Found record type = {}".format(round_record_wrapper.name))
-            round_data = pb.RecordNewRound()
-            round_data.ParseFromString(round_record_wrapper.data)
-            print_data_as_json(round_data, "RecordNewRound")
-            is_show_new_round_record = True
-
-        if round_record_wrapper.name == ".lq.RecordDiscardTile" and not is_show_discard_tile:
-            logging.info("Found record type = {}".format(round_record_wrapper.name))
-            discard_tile = pb.RecordDiscardTile()
-            discard_tile.ParseFromString(round_record_wrapper.data)
-            print_data_as_json(discard_tile, "RecordDiscardTile")
-            is_show_discard_tile = True
-
-        if round_record_wrapper.name == ".lq.RecordDealTile" and not is_show_deal_tile:
-            logging.info("Found record type = {}".format(round_record_wrapper.name))
-            deal_tile = pb.RecordDealTile()
-            deal_tile.ParseFromString(round_record_wrapper.data)
-            print_data_as_json(deal_tile, "RecordDealTile")
-            is_show_deal_tile = True
-
-    return res
+    return candidates[0]
 
 
-def print_data_as_json(data, type):
-    json = MessageToJson(data)
-    logging.info("{} json {}".format(type, json))
+def build_account_summary(account_info_res):
+    account = account_info_res.account
+    achievement_total = sum(item.count for item in account.achievement_count)
+    achievement_by_rare = {str(item.rare): item.count for item in account.achievement_count}
+
+    return {
+        "account_id": account.account_id,
+        "nickname": account.nickname,
+        "rank_4p": {"id": account.level.id, "score": account.level.score},
+        "rank_3p": {"id": account.level3.id, "score": account.level3.score},
+        "achievement": {"total": achievement_total, "by_rare": achievement_by_rare},
+    }
+
+
+def build_recent_from_statistics(stat_res, recent_count):
+    queried_at = datetime.now(timezone.utc)
+    queried_at_iso = queried_at.isoformat()
+    queried_date = queried_at.date().isoformat()
+
+    def block_score(data):
+        # Prefer the most representative block for this category.
+        return (
+            data.statistic.recent_round.total_count,
+            len(data.statistic.recent_10_game_result),
+        )
+
+    def items_from_block(data):
+        items = []
+        # recent_10_game_result often arrives oldest -> newest, so reverse for latest-first.
+        for game_result in reversed(data.statistic.recent_10_game_result):
+            items.append(
+                {
+                    "mahjong_category": data.mahjong_category,
+                    "game_category": data.game_category,
+                    "rank": game_result.rank,
+                    "final_point": game_result.final_point,
+                    "date": queried_date,
+                    "queried_at": queried_at_iso,
+                }
+            )
+        return items
+
+    by_category = {}
+
+    for stat_data in stat_res.statistic_data:
+        category = stat_data.mahjong_category
+        if category not in by_category:
+            by_category[category] = []
+        by_category[category].append(stat_data)
+
+    recent_4p = []
+    recent_3p = []
+    unknown = []
+
+    for category, blocks in by_category.items():
+        primary = max(blocks, key=block_score)
+        primary_items = items_from_block(primary)[:recent_count]
+
+        if category == 1:
+            recent_4p = primary_items
+        elif category == 2:
+            recent_3p = primary_items
+        else:
+            unknown.extend(primary_items)
+
+    return {
+        "four_player": recent_4p[:recent_count],
+        "three_player": recent_3p[:recent_count],
+        "unknown": unknown[:recent_count],
+    }
+
+
+async def build_summary(lobby, target_account_id, recent_count):
+    account_req = pb.ReqAccountInfo()
+    account_req.account_id = target_account_id
+    account_info_res = await lobby.fetch_account_info(account_req)
+
+    stat_req = pb.ReqAccountStatisticInfo()
+    stat_req.account_id = target_account_id
+    stat_res = await lobby.fetch_account_statistic_info(stat_req)
+
+    if stat_res.error.code:
+        raise RuntimeError(f"fetch_account_statistic_info failed: code={stat_res.error.code}")
+
+    queried_at_iso = datetime.now(timezone.utc).isoformat()
+
+    return {
+        "account": build_account_summary(account_info_res),
+        "recent_games": build_recent_from_statistics(stat_res, recent_count),
+        "source": "fetchAccountStatisticInfo",
+        "meta": {
+            "queried_at": queried_at_iso,
+            "date_note": "fetchAccountStatisticInfo recent_10_game_result does not include per-game datetime; date fields are query-time values.",
+        },
+    }
+
+
+async def main():
+    parser = OptionParser()
+    parser.add_option("-u", "--username", type="string", help="Login account.")
+    parser.add_option("-p", "--password", type="string", help="Login password.")
+    parser.add_option("-a", "--account-id", type="int", help="Target account id.")
+    parser.add_option("--target-nickname", type="string", help="Target nickname.")
+    parser.add_option("-n", "--recent-count", type="int", default=10, help="Recent count for each (3p/4p).")
+    parser.add_option("--quiet", action="store_true", help="Show only warnings/errors in terminal.")
+    parser.add_option("--log-file", type="string", help="Write detailed logs to a file.")
+
+    opts, _ = parser.parse_args()
+    setup_logging(log_file=opts.log_file, quiet=opts.quiet)
+
+    username = opts.username
+    password = opts.password
+    if not username or not password:
+        parser.error("Username and password are required")
+
+    recent_count = max(1, min(opts.recent_count or 10, 30))
+
+    lobby, channel, version_to_force = await connect()
+    try:
+        login_account_id = await login(lobby, username, password, version_to_force)
+
+        if opts.account_id:
+            target_account_id = opts.account_id
+        elif (opts.target_nickname or "").strip():
+            target_account_id = await resolve_account_id_by_nickname(lobby, opts.target_nickname.strip())
+        else:
+            target_account_id = login_account_id
+
+        summary = await build_summary(lobby, target_account_id, recent_count)
+        logging.info("%s", json.dumps(summary, ensure_ascii=False, indent=2))
+    finally:
+        await channel.close()
 
 
 if __name__ == "__main__":
