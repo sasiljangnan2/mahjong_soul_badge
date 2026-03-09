@@ -9,6 +9,7 @@ MANIFEST
 dist/*
 *.egg-info
 build/*
+data/
 
 
 temp

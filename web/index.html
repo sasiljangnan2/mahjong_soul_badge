@@ -1,0 +1,600 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Majsoul Ops Board</title>
+  <style>
+    @import url("https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Noto+Sans+KR:wght@400;500;700&display=swap");
+
+    :root {
+      --bg-1: #f3f7ef;
+      --bg-2: #cde3cf;
+      --ink: #14281d;
+      --ink-dim: #355845;
+      --panel: rgba(255, 255, 255, 0.78);
+      --line: rgba(45, 95, 66, 0.23);
+      --accent: #236442;
+      --accent-soft: #d9f0e2;
+      --accent-2: #8a4fff;
+      --good: #1f8a4d;
+      --warn: #c55b2c;
+      --danger: #9f2b2b;
+      --shadow: 0 18px 42px rgba(17, 57, 37, 0.12);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: "Noto Sans KR", sans-serif;
+      color: var(--ink);
+      background:
+        radial-gradient(1000px 420px at -5% -20%, #fff6c3 0%, transparent 60%),
+        radial-gradient(700px 500px at 110% 0%, #b2dfcf 0%, transparent 66%),
+        linear-gradient(145deg, var(--bg-1), var(--bg-2));
+      padding: 18px;
+    }
+
+    .app {
+      max-width: 1100px;
+      margin: 0 auto;
+      display: grid;
+      gap: 14px;
+      animation: rise 360ms ease both;
+    }
+
+    @keyframes rise {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .panel {
+      background: var(--panel);
+      backdrop-filter: blur(6px);
+      border: 1px solid var(--line);
+      border-radius: 20px;
+      box-shadow: var(--shadow);
+      padding: 16px;
+    }
+
+    .heading {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+      margin-bottom: 8px;
+    }
+
+    h1 {
+      font-family: "Space Grotesk", sans-serif;
+      margin: 0;
+      font-size: 29px;
+      letter-spacing: 0.2px;
+    }
+
+    .badge {
+      border-radius: 999px;
+      padding: 6px 10px;
+      font-size: 12px;
+      background: #ebfaf1;
+      border: 1px solid #9dd6af;
+      color: #165d3a;
+      white-space: nowrap;
+    }
+
+    .sub {
+      margin: 2px 0 0;
+      color: var(--ink-dim);
+      font-size: 14px;
+    }
+
+    .input-grid {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 10px;
+      margin-top: 12px;
+    }
+
+    label {
+      display: block;
+      font-size: 12px;
+      margin-bottom: 6px;
+      color: #2d6147;
+      font-weight: 600;
+    }
+
+    input {
+      width: 100%;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 10px 12px;
+      font-size: 14px;
+      background: rgba(255, 255, 255, 0.88);
+      color: var(--ink);
+    }
+
+    .actions {
+      display: flex;
+      gap: 10px;
+      margin-top: 12px;
+      flex-wrap: wrap;
+    }
+
+    button {
+      border: 0;
+      border-radius: 12px;
+      padding: 10px 14px;
+      font-weight: 700;
+      font-family: "Space Grotesk", sans-serif;
+      cursor: pointer;
+      transition: transform 0.16s ease, box-shadow 0.16s ease;
+    }
+
+    button:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 10px 18px rgba(22, 93, 58, 0.18);
+    }
+
+    .btn-sync {
+      background: linear-gradient(135deg, #1e7347, #3c9a61);
+      color: #fff;
+    }
+
+    .btn-load {
+      background: linear-gradient(135deg, #6f3ad3, #9b63ff);
+      color: #fff;
+    }
+
+    .status {
+      margin-top: 10px;
+      min-height: 22px;
+      color: var(--good);
+      font-size: 14px;
+      font-weight: 500;
+    }
+
+    .status.error { color: var(--danger); }
+
+    .dashboard {
+      display: none;
+      grid-template-columns: 1.1fr 0.9fr;
+      gap: 14px;
+    }
+
+    .dashboard.show {
+      display: grid;
+      animation: rise 280ms ease both;
+    }
+
+    .cards {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+
+    .stat-card {
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 10px;
+      background: #fcfffd;
+    }
+
+    .k {
+      color: #4c6d5d;
+      font-size: 12px;
+      margin-bottom: 3px;
+    }
+
+    .v {
+      font-family: "Space Grotesk", sans-serif;
+      font-size: 22px;
+      font-weight: 700;
+    }
+
+    .rank-boxes {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+
+    .rank-box {
+      border: 1px dashed #9ec5aa;
+      border-radius: 14px;
+      padding: 10px;
+      background: var(--accent-soft);
+    }
+
+    .rank-name {
+      font-size: 12px;
+      color: #2a5f42;
+      margin-bottom: 4px;
+    }
+
+    .bars {
+      display: grid;
+      gap: 8px;
+    }
+
+    .bar-row {
+      display: grid;
+      grid-template-columns: 56px 1fr 42px;
+      align-items: center;
+      gap: 8px;
+      font-size: 12px;
+    }
+
+    .bar-track {
+      position: relative;
+      border-radius: 999px;
+      height: 10px;
+      background: #e8efe8;
+      overflow: hidden;
+    }
+
+    .bar-fill {
+      position: absolute;
+      top: 0;
+      left: 0;
+      bottom: 0;
+      background: linear-gradient(90deg, #2a7b49, #53b071);
+    }
+
+    .lists {
+      display: grid;
+      gap: 10px;
+    }
+
+    .list-card {
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 10px;
+      background: #ffffff;
+    }
+
+    .list-title {
+      font-family: "Space Grotesk", sans-serif;
+      font-size: 15px;
+      margin-bottom: 6px;
+    }
+
+    ul {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      display: grid;
+      gap: 6px;
+      max-height: 220px;
+      overflow: auto;
+    }
+
+    li {
+      border-radius: 10px;
+      background: #f6faf7;
+      border: 1px solid #d6e5d9;
+      padding: 7px 8px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+      font-size: 13px;
+    }
+
+    .pill {
+      min-width: 30px;
+      text-align: center;
+      border-radius: 999px;
+      padding: 2px 8px;
+      font-weight: 700;
+      font-size: 12px;
+    }
+
+    .r1 { background: #d8f6df; color: #11683f; }
+    .r2 { background: #e9f3ff; color: #1f4f85; }
+    .r3 { background: #fff2d9; color: #995100; }
+    .r4 { background: #ffe2e2; color: #8e1e1e; }
+
+    details {
+      margin-top: 10px;
+    }
+
+    summary {
+      cursor: pointer;
+      color: #305d47;
+      font-weight: 700;
+    }
+
+    pre {
+      margin: 8px 0 0;
+      background: #f7fbf7;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 10px;
+      max-height: 260px;
+      overflow: auto;
+      font-size: 12px;
+      line-height: 1.35;
+    }
+
+    @media (max-width: 980px) {
+      .dashboard,
+      .input-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .cards {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .rank-boxes {
+        grid-template-columns: 1fr;
+      }
+
+      button { width: 100%; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <section class="panel">
+      <div class="heading">
+        <div>
+          <h1>Majsoul Ops Board</h1>
+          <p class="sub">닉네임으로 동기화하고, 전적 대시보드로 바로 확인</p>
+        </div>
+        <span class="badge">Nickname Sync Mode</span>
+      </div>
+
+      <div class="input-grid">
+        <div>
+          <label for="username">CN Username</label>
+          <input id="username" placeholder="login account">
+        </div>
+        <div>
+          <label for="password">CN Password</label>
+          <input id="password" type="password" placeholder="login password">
+        </div>
+        <div>
+          <label for="nickname">Target Nickname</label>
+          <input id="nickname" placeholder="target nickname">
+        </div>
+        <div>
+          <label for="nickname2">Second Nickname (Load Alias)</label>
+          <input id="nickname2" placeholder="alias nickname">
+        </div>
+        <div>
+          <label for="count">Recent Count</label>
+          <input id="count" type="number" min="1" max="30" value="10">
+        </div>
+      </div>
+
+      <div class="actions">
+        <button class="btn-sync" id="syncBtn">1) Sync Player</button>
+        <button class="btn-load" id="loadBtn">2) Load Dashboard</button>
+      </div>
+
+      <div id="status" class="status"></div>
+
+      <details>
+        <summary>Raw JSON</summary>
+        <pre id="output">{
+  "message": "동기화/조회 후 데이터가 표시됩니다."
+}</pre>
+      </details>
+    </section>
+
+    <section id="dashboard" class="dashboard">
+      <div class="panel">
+        <div class="cards">
+          <div class="stat-card">
+            <div class="k">Nickname</div>
+            <div id="statNickname" class="v">-</div>
+          </div>
+          <div class="stat-card">
+            <div class="k">Account ID</div>
+            <div id="statAccountId" class="v">-</div>
+          </div>
+          <div class="stat-card">
+            <div class="k">Achievement Total</div>
+            <div id="statAchievement" class="v">-</div>
+          </div>
+          <div class="stat-card">
+            <div class="k">Updated At</div>
+            <div id="statUpdated" class="v" style="font-size:16px;">-</div>
+          </div>
+        </div>
+
+        <div class="rank-boxes">
+          <div class="rank-box">
+            <div class="rank-name">4P Rank</div>
+            <div id="rank4p" class="v" style="font-size:20px;">-</div>
+          </div>
+          <div class="rank-box">
+            <div class="rank-name">3P Rank</div>
+            <div id="rank3p" class="v" style="font-size:20px;">-</div>
+          </div>
+        </div>
+
+        <div class="list-title">Recent Rank Distribution</div>
+        <div id="distBars" class="bars"></div>
+      </div>
+
+      <div class="lists">
+        <section class="list-card">
+          <div class="list-title">4P Recent</div>
+          <ul id="list4p"></ul>
+        </section>
+        <section class="list-card">
+          <div class="list-title">3P Recent</div>
+          <ul id="list3p"></ul>
+        </section>
+      </div>
+    </section>
+  </div>
+
+  <script>
+    const statusEl = document.getElementById("status");
+    const outputEl = document.getElementById("output");
+    const dashboardEl = document.getElementById("dashboard");
+
+    function setStatus(message, isError = false) {
+      statusEl.textContent = message;
+      statusEl.className = isError ? "status error" : "status";
+    }
+
+    function setOutput(data) {
+      outputEl.textContent = JSON.stringify(data, null, 2);
+    }
+
+    async function toJsonSafe(resp) {
+      const text = await resp.text();
+      try {
+        return JSON.parse(text);
+      } catch {
+        return { raw: text };
+      }
+    }
+
+    function rankClass(rank) {
+      if (rank === 1) return "r1";
+      if (rank === 2) return "r2";
+      if (rank === 3) return "r3";
+      return "r4";
+    }
+
+    function renderRecentList(elementId, items) {
+      const el = document.getElementById(elementId);
+      el.innerHTML = "";
+      if (!items || !items.length) {
+        el.innerHTML = "<li>데이터 없음</li>";
+        return;
+      }
+
+      for (const game of items) {
+        const li = document.createElement("li");
+        const point = Number(game.final_point || 0).toLocaleString();
+        li.innerHTML = `<span>점수 ${point}</span><span class="pill ${rankClass(game.rank)}">${game.rank}위</span>`;
+        el.appendChild(li);
+      }
+    }
+
+    function renderDistributionBars(recentGames) {
+      const dist = { 1: 0, 2: 0, 3: 0, 4: 0 };
+      for (const game of recentGames) {
+        const r = Number(game.rank || 4);
+        if (dist[r] !== undefined) {
+          dist[r] += 1;
+        }
+      }
+
+      const total = Object.values(dist).reduce((a, b) => a + b, 0) || 1;
+      const bars = document.getElementById("distBars");
+      bars.innerHTML = "";
+
+      for (const rank of [1, 2, 3, 4]) {
+        const count = dist[rank];
+        const width = Math.round((count / total) * 100);
+        const row = document.createElement("div");
+        row.className = "bar-row";
+        row.innerHTML = `
+          <span>${rank}위</span>
+          <div class="bar-track"><div class="bar-fill" style="width:${width}%"></div></div>
+          <strong>${count}</strong>
+        `;
+        bars.appendChild(row);
+      }
+    }
+
+    function renderDashboard(payload) {
+      const summary = payload.summary || {};
+      const account = summary.account || {};
+      const recent = summary.recent_games || {};
+
+      document.getElementById("statNickname").textContent = account.nickname || "-";
+      document.getElementById("statAccountId").textContent = String(account.account_id || "-");
+      document.getElementById("statAchievement").textContent = String(account.achievement?.total ?? "-");
+      document.getElementById("statUpdated").textContent = (payload.updated_at || "-").replace("T", " ").slice(0, 19);
+
+      const rank4 = account.rank_4p || {};
+      const rank3 = account.rank_3p || {};
+      const rank4Name = rank4.name_ko || `ID ${rank4.id ?? "-"}`;
+      const rank3Name = rank3.name_ko || `ID ${rank3.id ?? "-"}`;
+      document.getElementById("rank4p").textContent = `${rank4Name} / ${Number(rank4.score || 0).toLocaleString()} pt`;
+      document.getElementById("rank3p").textContent = `${rank3Name} / ${Number(rank3.score || 0).toLocaleString()} pt`;
+
+      const list4p = recent.four_player || [];
+      const list3p = recent.three_player || [];
+      renderRecentList("list4p", list4p);
+      renderRecentList("list3p", list3p);
+
+      const merged = list4p.concat(list3p);
+      renderDistributionBars(merged);
+
+      dashboardEl.classList.add("show");
+    }
+
+    document.getElementById("syncBtn").addEventListener("click", async () => {
+      const username = document.getElementById("username").value.trim();
+      const password = document.getElementById("password").value;
+      const targetNickname = document.getElementById("nickname").value.trim();
+      const secondaryNickname = document.getElementById("nickname2").value.trim();
+      const recentCount = Number(document.getElementById("count").value || 10);
+
+      if (!username || !password) {
+        setStatus("username/password를 입력해 주세요.", true);
+        return;
+      }
+
+      setStatus("동기화 중...");
+      const resp = await fetch("/api/sync", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          username,
+          password,
+          target_nickname: targetNickname || null,
+          secondary_nickname: secondaryNickname || null,
+          recent_count: recentCount,
+        }),
+      });
+
+      const data = await toJsonSafe(resp);
+      setOutput(data);
+
+      if (!resp.ok) {
+        setStatus("동기화 실패", true);
+        return;
+      }
+
+      setStatus("동기화 성공. 이제 Load Dashboard 클릭");
+    });
+
+    document.getElementById("loadBtn").addEventListener("click", async () => {
+      const secondary = document.getElementById("nickname2").value.trim();
+      const primary = document.getElementById("nickname").value.trim();
+      const nickname = secondary || primary;
+
+      if (!nickname) {
+        setStatus("조회할 닉네임을 입력해 주세요.", true);
+        return;
+      }
+
+      setStatus("조회 중...");
+      const resp = await fetch(`/api/player/${encodeURIComponent(nickname)}`);
+      const data = await toJsonSafe(resp);
+      setOutput(data);
+
+      if (!resp.ok) {
+        setStatus("조회 실패", true);
+        return;
+      }
+
+      renderDashboard(data);
+      setStatus("조회 성공");
+    });
+  </script>
+</body>
+</html>
