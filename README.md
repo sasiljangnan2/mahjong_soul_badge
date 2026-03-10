@@ -1,161 +1,61 @@
-This repository is based on https://github.com/chaserhkj/PyMajSoul/ and provides Python wrappers for Majsoul.
+# Mahjong Soul Badge
 
-It now includes an MVP API server for a Mazassumnida-like project flow:
-- sync Majsoul account stats
-- persist snapshot JSON locally
-- read player stats through HTTP API
+> 작혼 전적을 GitHub README에 배지로 표시해주는 서비스입니다.
 
-## Quick Start
+[![badge preview](https://your-server-url.com/badge/닉네임)](https://your-server-url.com/badge/닉네임)
 
-Windows (fastest):
+---
 
-```powershell
-./run.ps1
+## 배지 사용 방법
+
+### 1. 서버 URL 확인
+
+배지 URL 형식:
+
+```
+https://mahjong-soul-api.onrender.com/badge/ssawual
 ```
 
-If PowerShell execution policy blocks scripts, use:
-
-```bat
-run.bat
+3인마작 배지:
+```
+https://mahjong-soul-api.onrender.com/badge3/ssawual
 ```
 
-Manual way:
+---
 
-1. Install dependencies:
+### 2. GitHub README에 임베드
 
-```bash
-pip install -r requirements.txt
+아래 코드를 `README.md`에 붙여넣고 <작혼_UID>`을 교체하세요.
+
+**4인마작 배지:**
+```markdown
+![Mahjong Soul Badge](https://<mahjong-soul-api.onrender.com/badge/<작혼_UID>)
 ```
 
-2. Run API server:
 
-```bash
-uvicorn server:app --reload
+**3인마작 배지:**
+```markdown
+![Mahjong Soul 3P Badge](https://https://mahjong-soul-api.onrender.com/badge/badge3/<작혼_UID>)
 ```
 
-3. Open API docs:
+---
 
-`http://127.0.0.1:8000/docs`
+### 3. 데이터 갱신
 
-4. Open web console (nickname sync/player test UI):
+- 배지 데이터는 서버에서 **1시간마다 자동으로 갱신**됩니다.
 
-`http://127.0.0.1:8000/`
-
-The web console now shows dashboard cards (account, rank, achievement), recent 3P/4P lists, and rank distribution bars after load.
-
-## API Endpoints
-
-- `GET /health`
-- `POST /api/sync`
-- `GET /api/player/{nickname}`
-- `GET /api/player/{nickname}/public.json` (public profile JSON for embed)
-- `GET /api/player/{nickname}/badge.svg` (image badge for GitHub README)
-- `GET /api/player/{nickname}/badge3.svg` (3-player image badge)
-- `GET /api/player/{nickname}/profile.md` (ready-to-copy markdown snippet)
-- `POST /api/sync/jobs` (create auto sync job)
-- `GET /api/sync/jobs` (list auto sync jobs)
-- `DELETE /api/sync/jobs/{job_id}` (delete auto sync job)
-
-### Sync Example
-
-`POST /api/sync` body:
-
-```json
-{
-	"username": "your_cn_login_account",
-	"password": "your_cn_login_password",
-	"target_nickname": "target_player_nickname",
-	"secondary_nickname": "load_alias_nickname",
-	"recent_count": 10
-}
+```
+https://<서버_주소>/badge/<작혼_UID>?refresh=1
 ```
 
-Synced data is saved to `data/players/{account_id}.json`.
+> `?refresh=1`은 작혼 서버에 직접 요청하므로 응답이 느릴 수 있습니다.
 
-If `target_nickname` is omitted, sync uses the logged-in account.
+---
 
-If `secondary_nickname` is provided, you can load the same player with that nickname alias via `GET /api/player/{nickname}`.
+## 주의사항
 
-Rank data now includes parsed fields like `tier`, `star`, `name_ko`, and `name_en` (example: `작걸 3`).
-Badge tier emblems are loaded from `assets/ranks/*.svg`.
-Account data includes avatar fields, and badge currently uses only `avatar.avatar_id` (frame is not rendered).
-Badge avatar image is loaded from `assets/avatars/{avatar_id_first4}.svg|png|webp|jpg` and falls back to `assets/avatars/default.svg`.
-
-### Player Query Example
-
-`GET /api/player/{nickname}`
-
-Example:
-
-`GET /api/player/target_player_nickname`
-
-### GitHub / External Website Embed
-
-After deployment (for example `https://your-domain.com`), use:
-
-- Badge image: `https://your-domain.com/api/player/{nickname}/badge.svg`
-- 3P Badge image: `https://your-domain.com/api/player/{nickname}/badge3.svg`
-- Public JSON: `https://your-domain.com/api/player/{nickname}/public.json`
-- Markdown snippet: `https://your-domain.com/api/player/{nickname}/profile.md`
-
-GitHub README example:
-
-```md
-![Majsoul Badge](https://your-domain.com/api/player/target_player_nickname/badge.svg)
-```
-
-Website example (browser fetch):
-
-```js
-const res = await fetch("https://your-domain.com/api/player/target_player_nickname/public.json");
-const profile = await res.json();
-console.log(profile.rank_4p.name_ko, profile.rank_4p.score);
-```
-
-### Auto Sync Job Example
-
-`POST /api/sync/jobs` body:
-
-```json
-{
-	"username": "your_cn_login_account",
-	"password": "your_cn_login_password",
-	"target_nickname": "target_player_nickname",
-	"secondary_nickname": "load_alias_nickname",
-	"recent_count": 10,
-	"interval_minutes": 10
-}
-```
-
-The scheduler runs in the background while server is running and stores jobs in `data/sync_jobs.json`.
-
-Security note: job passwords are stored in plain text in `data/sync_jobs.json` for MVP convenience.
-
-## CLI Example
-
-You can still use the CLI script:
-
-```bash
-python example.py -u username -p password --target-nickname nickname
-```
-
-## Notes
-
-- Current login flow supports CN server login ID/password.
-- For EN/JP, additional auth flow (email/social login) must be implemented.
-- `fetchAccountStatisticInfo` does not include exact per-match datetime for recent list.
-
-## For Developer
-
-### Requirements
-
-1. Install packages from `requirements.txt`
-2. Install protobuf compiler
-
-### Update Protocol Files
-
-1. Download latest `liqi.json` and replace `ms/liqi.json`
-2. `python generate_proto_file.py`
-3. `protoc --python_out=. protocol.proto`
-4. `chmod +x ms-plugin.py`
-5. `protoc --custom_out=. --plugin=protoc-gen-custom=ms-plugin.py ./protocol.proto`
+- 이 프로젝트는 [PyMajSoul](https://github.com/chaserhkj/PyMajSoul/)을 기반으로 합니다.
+- 비공식 프로젝트이며 Catfood Studio / YoStar와 무관합니다.
+- 작혼 공식 API가 아닌 비공개 프로토콜을 사용합니다. 문제가 발생할 시 이 리포지토리를 삭제하겠습니다.
+- 저작권 문의는 이슈로 남겨주세요.
+- 이 저자는 케릭터가 이치히메 밖에 없어서 이치히메 프로필로만 적용이 가능힙니다. 케릭터와 왼쪽 위에 뜨는 코드를 이슈로 남겨주시면 추후 추가하겠습니다.
