@@ -7,6 +7,20 @@ It now includes an MVP API server for a Mazassumnida-like project flow:
 
 ## Quick Start
 
+Windows (fastest):
+
+```powershell
+./run.ps1
+```
+
+If PowerShell execution policy blocks scripts, use:
+
+```bat
+run.bat
+```
+
+Manual way:
+
 1. Install dependencies:
 
 ```bash
@@ -34,6 +48,13 @@ The web console now shows dashboard cards (account, rank, achievement), recent 3
 - `GET /health`
 - `POST /api/sync`
 - `GET /api/player/{nickname}`
+- `GET /api/player/{nickname}/public.json` (public profile JSON for embed)
+- `GET /api/player/{nickname}/badge.svg` (image badge for GitHub README)
+- `GET /api/player/{nickname}/badge3.svg` (3-player image badge)
+- `GET /api/player/{nickname}/profile.md` (ready-to-copy markdown snippet)
+- `POST /api/sync/jobs` (create auto sync job)
+- `GET /api/sync/jobs` (list auto sync jobs)
+- `DELETE /api/sync/jobs/{job_id}` (delete auto sync job)
 
 ### Sync Example
 
@@ -56,6 +77,9 @@ If `target_nickname` is omitted, sync uses the logged-in account.
 If `secondary_nickname` is provided, you can load the same player with that nickname alias via `GET /api/player/{nickname}`.
 
 Rank data now includes parsed fields like `tier`, `star`, `name_ko`, and `name_en` (example: `작걸 3`).
+Badge tier emblems are loaded from `assets/ranks/*.svg`.
+Account data includes avatar fields, and badge currently uses only `avatar.avatar_id` (frame is not rendered).
+Badge avatar image is loaded from `assets/avatars/{avatar_id_first4}.svg|png|webp|jpg` and falls back to `assets/avatars/default.svg`.
 
 ### Player Query Example
 
@@ -64,6 +88,48 @@ Rank data now includes parsed fields like `tier`, `star`, `name_ko`, and `name_e
 Example:
 
 `GET /api/player/target_player_nickname`
+
+### GitHub / External Website Embed
+
+After deployment (for example `https://your-domain.com`), use:
+
+- Badge image: `https://your-domain.com/api/player/{nickname}/badge.svg`
+- 3P Badge image: `https://your-domain.com/api/player/{nickname}/badge3.svg`
+- Public JSON: `https://your-domain.com/api/player/{nickname}/public.json`
+- Markdown snippet: `https://your-domain.com/api/player/{nickname}/profile.md`
+
+GitHub README example:
+
+```md
+![Majsoul Badge](https://your-domain.com/api/player/target_player_nickname/badge.svg)
+```
+
+Website example (browser fetch):
+
+```js
+const res = await fetch("https://your-domain.com/api/player/target_player_nickname/public.json");
+const profile = await res.json();
+console.log(profile.rank_4p.name_ko, profile.rank_4p.score);
+```
+
+### Auto Sync Job Example
+
+`POST /api/sync/jobs` body:
+
+```json
+{
+	"username": "your_cn_login_account",
+	"password": "your_cn_login_password",
+	"target_nickname": "target_player_nickname",
+	"secondary_nickname": "load_alias_nickname",
+	"recent_count": 10,
+	"interval_minutes": 10
+}
+```
+
+The scheduler runs in the background while server is running and stores jobs in `data/sync_jobs.json`.
+
+Security note: job passwords are stored in plain text in `data/sync_jobs.json` for MVP convenience.
 
 ## CLI Example
 

@@ -162,6 +162,10 @@ def build_account_summary(account_info_res):
     return {
         "account_id": account.account_id,
         "nickname": account.nickname,
+        "avatar": {
+            "avatar_id": account.avatar_id,
+            "avatar_frame": account.avatar_frame,
+        },
         "rank_4p": _build_rank_info(account.level.id, account.level.score),
         "rank_3p": _build_rank_info(account.level3.id, account.level3.score),
         "achievement": {"total": achievement_total, "by_rare": achievement_by_rare},
