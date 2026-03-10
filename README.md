@@ -28,7 +28,7 @@
 - 배지 데이터는 서버에서 **1시간마다 자동으로 갱신**됩니다.
 
 ```
-https://https://https://mahjong-soul-api.onrender.com/badge/<작혼_UID>?refresh=1
+https://mahjong-soul-api.onrender.com/badge/<작혼_UID>?refresh=1
 ```
 
 > `?refresh=1`은 작혼 서버에 직접 요청하므로 응답이 느릴 수 있습니다.
