@@ -2,7 +2,7 @@
 
 > 작혼 전적을 GitHub README에 배지로 표시해주는 프로젝트입니다.
 
-[![badge preview](https://ahjong-soul-api.onrender.com/badge/127512551)](https://ahjong-soul-api.onrender.com/badge/127512551)
+[![badge preview](https://mahjong-soul-api.onrender.com/badge/127512551)](https://mahjong-soul-api.onrender.com/badge/127512551)
 
 ---
 
