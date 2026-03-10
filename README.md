@@ -1,8 +1,8 @@
 # Mahjong Soul Badge
 
-> 작혼 전적을 GitHub README에 배지로 표시해주는 서비스입니다.
+> 작혼 전적을 GitHub README에 배지로 표시해주는 프로젝트입니다.
 
-[![badge preview](https://your-server-url.com/badge/127512551)](https://your-server-url.com/badge/127512551)
+[![badge preview](https://ahjong-soul-api.onrender.com/badge/127512551)](https://ahjong-soul-api.onrender.com/badge/127512551)
 
 ---
 
@@ -12,7 +12,7 @@
 
 **4인마작 배지:**
 ```markdown
-![Mahjong Soul Badge](https://<mahjong-soul-api.onrender.com/badge/<작혼_UID>)
+![Mahjong Soul Badge](https://mahjong-soul-api.onrender.com/badge/<작혼_UID>)
 ```
 
 
