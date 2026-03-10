@@ -13,12 +13,12 @@
 배지 URL 형식:
 
 ```
-https://mahjong-soul-api.onrender.com/badge/ssawual
+https://mahjong-soul-api.onrender.com/badge/127512551
 ```
 
 3인마작 배지:
 ```
-https://mahjong-soul-api.onrender.com/badge3/ssawual
+https://mahjong-soul-api.onrender.com/badge3/127512551
 ```
 
 ---
