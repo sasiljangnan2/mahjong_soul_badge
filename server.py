@@ -2,27 +2,33 @@ import asyncio
 import base64
 import json
 import mimetypes
-import uuid
-from datetime import datetime, timedelta, timezone
+import os
+from datetime import datetime, timezone
 from functools import lru_cache
 from html import escape
 from pathlib import Path
 
+# .env 파일 자동 로드 (python-dotenv 없어도 직접 파싱)
+_env_file = Path(__file__).resolve().parent / ".env"
+if _env_file.exists():
+    for _line in _env_file.read_text(encoding="utf-8").splitlines():
+        _line = _line.strip()
+        if _line and not _line.startswith("#") and "=" in _line:
+            _k, _, _v = _line.partition("=")
+            os.environ.setdefault(_k.strip(), _v.strip())
+
+_AUTO_SYNC_USERNAME: str = os.environ.get("MAJSOUL_USERNAME", "")
+_AUTO_SYNC_PASSWORD: str = os.environ.get("MAJSOUL_PASSWORD", "")
+
 from fastapi import FastAPI, HTTPException
-from fastapi import Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
-from fastapi.responses import PlainTextResponse
 from fastapi.responses import Response
-from pydantic import BaseModel, Field
 
 from majsoul_client import fetch_summary
 
 DATA_DIR = Path("data")
 PLAYERS_DIR = DATA_DIR / "players"
 NICKNAME_INDEX_FILE = DATA_DIR / "nickname_index.json"
-SYNC_JOBS_FILE = DATA_DIR / "sync_jobs.json"
-WEB_DIR = Path(__file__).resolve().parent / "web"
 RANK_ASSETS_DIR = Path(__file__).resolve().parent / "assets" / "ranks"
 AVATAR_ASSETS_DIR = Path(__file__).resolve().parent / "assets" / "avatars"
 
@@ -63,9 +69,7 @@ _RANK_SCORE_RANGES: dict[tuple[int, int], tuple[int, int]] = {
     (5, 3): (4500, 9000),
 }
 
-app = FastAPI(title="Majsoul Stats Sync API", version="0.1.0")
-sync_jobs_lock = asyncio.Lock()
-scheduler_task = None
+app = FastAPI(title="Majsoul Badge API", version="0.1.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -76,48 +80,8 @@ app.add_middleware(
 )
 
 
-class SyncRequest(BaseModel):
-    username: str = Field(..., description="Majsoul CN login account")
-    password: str = Field(..., description="Majsoul CN login password")
-    target_nickname: str | None = Field(default=None, description="Target nickname")
-    secondary_nickname: str | None = Field(default=None, description="Alias nickname used for player load")
-    recent_count: int = Field(default=10, ge=1, le=30, description="Recent records count per mode")
-
-
-class AutoSyncJobRequest(SyncRequest):
-    interval_minutes: int = Field(default=10, ge=1, le=1440, description="How often to run this sync job")
-
-
-def _utcnow() -> datetime:
-    return datetime.now(timezone.utc)
-
-
-def _parse_iso(value: str | None) -> datetime | None:
-    if not value:
-        return None
-    try:
-        return datetime.fromisoformat(value)
-    except ValueError:
-        return None
-
-
 def _player_file(account_id: int) -> Path:
     return PLAYERS_DIR / f"{account_id}.json"
-
-
-def _load_sync_jobs() -> list[dict]:
-    if not SYNC_JOBS_FILE.exists():
-        return []
-
-    raw = json.loads(SYNC_JOBS_FILE.read_text(encoding="utf-8"))
-    if not isinstance(raw, list):
-        return []
-    return [item for item in raw if isinstance(item, dict)]
-
-
-def _save_sync_jobs(jobs: list[dict]) -> None:
-    DATA_DIR.mkdir(parents=True, exist_ok=True)
-    SYNC_JOBS_FILE.write_text(json.dumps(jobs, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
 def _load_nickname_index() -> dict[str, int]:
@@ -178,16 +142,35 @@ def _save_summary(summary: dict, aliases: list[str] | None = None) -> dict:
     return payload
 
 
-def _load_player_payload_by_nickname(nickname: str) -> dict:
+async def _load_or_auto_sync(nickname: str) -> dict:
+    """캐시된 데이터를 반환하고, 없으면 환경변수 계정으로 자동 sync 후 반환."""
     account_id = _find_account_id_by_nickname(nickname)
-    if account_id is None:
-        raise HTTPException(status_code=404, detail="Player data not found. Call /api/sync with target_nickname first.")
+    if account_id is not None:
+        file_path = _player_file(account_id)
+        if file_path.exists():
+            return json.loads(file_path.read_text(encoding="utf-8"))
 
-    file_path = _player_file(account_id)
-    if not file_path.exists():
-        raise HTTPException(status_code=404, detail="Player data file missing. Call /api/sync again.")
+    if not _AUTO_SYNC_USERNAME or not _AUTO_SYNC_PASSWORD:
+        raise HTTPException(
+            status_code=404,
+            detail=(
+                "Player data not found. "
+                "Set MAJSOUL_USERNAME / MAJSOUL_PASSWORD in .env for auto-sync, "
+                "or call POST /api/sync manually."
+            ),
+        )
 
-    return json.loads(file_path.read_text(encoding="utf-8"))
+    try:
+        summary = await fetch_summary(
+            username=_AUTO_SYNC_USERNAME,
+            password=_AUTO_SYNC_PASSWORD,
+            target_nickname=nickname,
+            recent_count=10,
+        )
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail=f"Auto-sync failed: {exc}")
+
+    return _save_summary(summary, aliases=[nickname])
 
 
 def _build_public_profile(payload: dict) -> dict:
@@ -465,208 +448,9 @@ def _build_badge3_svg(profile: dict) -> str:
     )
 
 
-def _build_profile_markdown(base_url: str, nickname: str, profile: dict) -> str:
-    safe_nickname = nickname.strip()
-    badge_url = f"{base_url}/api/player/{safe_nickname}/badge.svg"
-    profile_url = f"{base_url}/api/player/{safe_nickname}"
-    rank4 = profile.get("rank_4p") or {}
-    rank3 = profile.get("rank_3p") or {}
-
-    lines = [
-        f"![Majsoul Badge]({badge_url})",
-        "",
-        f"- Nickname: **{profile.get('nickname', '-')}**",
-        f"- 4P Rank: **{rank4.get('name_ko', rank4.get('id', '-'))}** ({rank4.get('score', '-') } pt)",
-        f"- 3P Rank: **{rank3.get('name_ko', rank3.get('id', '-'))}** ({rank3.get('score', '-') } pt)",
-        f"- Achievement Total: **{profile.get('achievement_total', '-')}**",
-        f"- JSON API: {profile_url}",
-    ]
-    return "\n".join(lines)
-
-
-async def _run_sync_job(job: dict) -> None:
-    try:
-        summary = await fetch_summary(
-            username=job["username"],
-            password=job["password"],
-            target_nickname=job.get("target_nickname"),
-            recent_count=int(job.get("recent_count", 10)),
-        )
-        aliases = [job.get("target_nickname") or "", job.get("secondary_nickname") or ""]
-        _save_summary(summary, aliases=aliases)
-        status = "ok"
-        error_text = None
-    except Exception as exc:
-        status = "error"
-        error_text = str(exc)
-
-    now_iso = _utcnow().isoformat()
-    async with sync_jobs_lock:
-        jobs = _load_sync_jobs()
-        for item in jobs:
-            if item.get("job_id") != job.get("job_id"):
-                continue
-
-            item["last_run_at"] = now_iso
-            item["last_status"] = status
-            item["last_error"] = error_text
-            item["run_count"] = int(item.get("run_count", 0)) + 1
-            break
-        _save_sync_jobs(jobs)
-
-
-async def _scheduler_loop() -> None:
-    while True:
-        due_jobs: list[dict] = []
-        now = _utcnow()
-        async with sync_jobs_lock:
-            jobs = _load_sync_jobs()
-            changed = False
-            for job in jobs:
-                if not job.get("enabled", True):
-                    continue
-
-                next_run_at = _parse_iso(job.get("next_run_at"))
-                if next_run_at and next_run_at > now:
-                    continue
-
-                interval_minutes = max(1, int(job.get("interval_minutes", 10)))
-                job["next_run_at"] = (now + timedelta(minutes=interval_minutes)).isoformat()
-                due_jobs.append(dict(job))
-                changed = True
-
-            if changed:
-                _save_sync_jobs(jobs)
-
-        for job in due_jobs:
-            await _run_sync_job(job)
-
-        await asyncio.sleep(5)
-
-
-@app.on_event("startup")
-async def startup_scheduler():
-    global scheduler_task
-    if scheduler_task is None:
-        scheduler_task = asyncio.create_task(_scheduler_loop())
-
-
-@app.on_event("shutdown")
-async def shutdown_scheduler():
-    global scheduler_task
-    if scheduler_task is not None:
-        scheduler_task.cancel()
-        try:
-            await scheduler_task
-        except asyncio.CancelledError:
-            pass
-        scheduler_task = None
-
-
-@app.get("/health")
-async def health():
-    return {"ok": True}
-
-
-@app.get("/")
-async def index():
-    index_file = WEB_DIR / "index.html"
-    if not index_file.exists():
-        raise HTTPException(status_code=404, detail="web/index.html not found")
-    return FileResponse(index_file)
-
-
-@app.post("/api/sync")
-async def sync_player(request: SyncRequest):
-    try:
-        summary = await fetch_summary(
-            username=request.username,
-            password=request.password,
-            target_nickname=request.target_nickname,
-            recent_count=request.recent_count,
-        )
-    except Exception as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
-
-    aliases = [request.target_nickname or "", request.secondary_nickname or ""]
-    stored = _save_summary(summary, aliases=aliases)
-    return {
-        "ok": True,
-        "nickname": stored.get("nickname"),
-        "secondary_nickname": (request.secondary_nickname or "").strip() or None,
-        "updated_at": stored["updated_at"],
-    }
-
-
-@app.post("/api/sync/jobs")
-async def create_sync_job(request: AutoSyncJobRequest):
-    now = _utcnow()
-    job = {
-        "job_id": uuid.uuid4().hex[:10],
-        "enabled": True,
-        "username": request.username,
-        "password": request.password,
-        "target_nickname": (request.target_nickname or "").strip() or None,
-        "secondary_nickname": (request.secondary_nickname or "").strip() or None,
-        "recent_count": request.recent_count,
-        "interval_minutes": request.interval_minutes,
-        "created_at": now.isoformat(),
-        "next_run_at": now.isoformat(),
-        "last_run_at": None,
-        "last_status": "pending",
-        "last_error": None,
-        "run_count": 0,
-    }
-
-    async with sync_jobs_lock:
-        jobs = _load_sync_jobs()
-        jobs.append(job)
-        _save_sync_jobs(jobs)
-
-    return {"ok": True, "job_id": job["job_id"], "next_run_at": job["next_run_at"]}
-
-
-@app.get("/api/sync/jobs")
-async def list_sync_jobs():
-    async with sync_jobs_lock:
-        jobs = _load_sync_jobs()
-
-    # Do not expose passwords in API responses.
-    public_jobs = []
-    for item in jobs:
-        clone = dict(item)
-        clone.pop("password", None)
-        public_jobs.append(clone)
-
-    return {"ok": True, "jobs": public_jobs}
-
-
-@app.delete("/api/sync/jobs/{job_id}")
-async def delete_sync_job(job_id: str):
-    async with sync_jobs_lock:
-        jobs = _load_sync_jobs()
-        kept = [item for item in jobs if item.get("job_id") != job_id]
-        if len(kept) == len(jobs):
-            raise HTTPException(status_code=404, detail="sync job not found")
-        _save_sync_jobs(kept)
-
-    return {"ok": True, "job_id": job_id}
-
-
-@app.get("/api/player/{nickname}")
-async def get_player(nickname: str):
-    return _load_player_payload_by_nickname(nickname)
-
-
-@app.get("/api/player/{nickname}/public.json")
-async def get_player_public_profile(nickname: str):
-    payload = _load_player_payload_by_nickname(nickname)
-    return _build_public_profile(payload)
-
-
 @app.get("/api/player/{nickname}/badge.svg")
 async def get_player_badge_svg(nickname: str):
-    payload = _load_player_payload_by_nickname(nickname)
+    payload = await _load_or_auto_sync(nickname)
     profile = _build_public_profile(payload)
     svg = _build_badge_svg(profile)
     return Response(content=svg, media_type="image/svg+xml")
@@ -674,16 +458,26 @@ async def get_player_badge_svg(nickname: str):
 
 @app.get("/api/player/{nickname}/badge3.svg")
 async def get_player_badge3_svg(nickname: str):
-    payload = _load_player_payload_by_nickname(nickname)
+    payload = await _load_or_auto_sync(nickname)
     profile = _build_public_profile(payload)
     svg = _build_badge3_svg(profile)
     return Response(content=svg, media_type="image/svg+xml")
 
 
-@app.get("/api/player/{nickname}/profile.md")
-async def get_player_profile_markdown(nickname: str, request: Request):
-    payload = _load_player_payload_by_nickname(nickname)
+
+# --- 짧은 alias URL (GitHub README 임베드용) ---
+
+@app.get("/badge/{nickname}")
+async def get_badge_short(nickname: str):
+    payload = await _load_or_auto_sync(nickname)
     profile = _build_public_profile(payload)
-    base_url = str(request.base_url).rstrip("/")
-    md = _build_profile_markdown(base_url, nickname, profile)
-    return PlainTextResponse(content=md, media_type="text/markdown")
+    svg = _build_badge_svg(profile)
+    return Response(content=svg, media_type="image/svg+xml")
+
+
+@app.get("/badge3/{nickname}")
+async def get_badge3_short(nickname: str):
+    payload = await _load_or_auto_sync(nickname)
+    profile = _build_public_profile(payload)
+    svg = _build_badge3_svg(profile)
+    return Response(content=svg, media_type="image/svg+xml")
