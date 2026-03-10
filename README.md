@@ -2,28 +2,11 @@
 
 > 작혼 전적을 GitHub README에 배지로 표시해주는 서비스입니다.
 
-[![badge preview](https://your-server-url.com/badge/닉네임)](https://your-server-url.com/badge/닉네임)
+[![badge preview](https://your-server-url.com/badge/127512551)](https://your-server-url.com/badge/127512551)
 
 ---
 
 ## 배지 사용 방법
-
-### 1. 서버 URL 확인
-
-배지 URL 형식:
-
-```
-https://mahjong-soul-api.onrender.com/badge/127512551
-```
-
-3인마작 배지:
-```
-https://mahjong-soul-api.onrender.com/badge3/127512551
-```
-
----
-
-### 2. GitHub README에 임베드
 
 아래 코드를 `README.md`에 붙여넣고 <작혼_UID>`을 교체하세요.
 
@@ -40,7 +23,7 @@ https://mahjong-soul-api.onrender.com/badge3/127512551
 
 ---
 
-### 3. 데이터 갱신
+### 데이터 갱신
 
 - 배지 데이터는 서버에서 **1시간마다 자동으로 갱신**됩니다.
 
