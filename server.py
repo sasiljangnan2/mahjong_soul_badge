@@ -1,12 +1,16 @@
 import asyncio
 import base64
 import json
+import logging
 import mimetypes
 import os
+from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from functools import lru_cache
 from html import escape
 from pathlib import Path
+
+logger = logging.getLogger("majsoul_badge")
 
 # .env 파일 자동 로드 (python-dotenv 없어도 직접 파싱)
 _env_file = Path(__file__).resolve().parent / ".env"
@@ -20,7 +24,7 @@ if _env_file.exists():
 _AUTO_SYNC_USERNAME: str = os.environ.get("MAJSOUL_USERNAME", "")
 _AUTO_SYNC_PASSWORD: str = os.environ.get("MAJSOUL_PASSWORD", "")
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
 
@@ -69,7 +73,60 @@ _RANK_SCORE_RANGES: dict[tuple[int, int], tuple[int, int]] = {
     (5, 3): (4500, 9000),
 }
 
-app = FastAPI(title="Majsoul Badge API", version="0.1.0")
+SYNC_INTERVAL_SECONDS = int(os.environ.get("SYNC_INTERVAL", 3600))  # 기본 1시간
+
+
+async def _background_sync_all() -> None:
+    """알려진 모든 플레이어를 SYNC_INTERVAL_SECONDS 마다 재동기화한다."""
+    if not _AUTO_SYNC_USERNAME or not _AUTO_SYNC_PASSWORD:
+        logger.info("[scheduler] MAJSOUL_USERNAME/PASSWORD 미설정 — 자동 sync 비활성화")
+        return
+
+    logger.info("[scheduler] 백그라운드 sync 루프 시작 (간격: %ds)", SYNC_INTERVAL_SECONDS)
+    while True:
+        await asyncio.sleep(SYNC_INTERVAL_SECONDS)
+        index = _load_nickname_index()
+        nicknames = list(index.keys())
+        if not nicknames:
+            logger.info("[scheduler] 동기화할 플레이어 없음")
+            continue
+        logger.info("[scheduler] %d명 sync 시작", len(nicknames))
+        seen: set[int] = set()
+        for nickname in nicknames:
+            account_id = index.get(nickname)
+            if account_id in seen:
+                continue
+            seen.add(account_id)
+            try:
+                summary = await fetch_summary(
+                    username=_AUTO_SYNC_USERNAME,
+                    password=_AUTO_SYNC_PASSWORD,
+                    target_nickname=nickname,
+                    recent_count=10,
+                )
+                _save_summary(summary, aliases=[nickname])
+                logger.info("[scheduler] ✓ %s", nickname)
+            except Exception as exc:
+                logger.warning("[scheduler] ✗ %s: %s", nickname, exc)
+            # 계정 간 짧은 딜레이 (서버 부하 방지)
+            await asyncio.sleep(2)
+        logger.info("[scheduler] 전체 sync 완료")
+
+
+@asynccontextmanager
+async def lifespan(_app):
+    task = asyncio.create_task(_background_sync_all())
+    try:
+        yield
+    finally:
+        task.cancel()
+        try:
+            await task
+        except asyncio.CancelledError:
+            pass
+
+
+app = FastAPI(title="Majsoul Badge API", version="0.1.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -142,13 +199,15 @@ def _save_summary(summary: dict, aliases: list[str] | None = None) -> dict:
     return payload
 
 
-async def _load_or_auto_sync(nickname: str) -> dict:
-    """캐시된 데이터를 반환하고, 없으면 환경변수 계정으로 자동 sync 후 반환."""
-    account_id = _find_account_id_by_nickname(nickname)
-    if account_id is not None:
-        file_path = _player_file(account_id)
-        if file_path.exists():
-            return json.loads(file_path.read_text(encoding="utf-8"))
+async def _load_or_auto_sync(nickname: str, force: bool = False) -> dict:
+    """캐시된 데이터를 반환하고, 없으면 환경변수 계정으로 자동 sync 후 반환.
+    force=True이면 캐시를 무시하고 항상 새로 sync한다."""
+    if not force:
+        account_id = _find_account_id_by_nickname(nickname)
+        if account_id is not None:
+            file_path = _player_file(account_id)
+            if file_path.exists():
+                return json.loads(file_path.read_text(encoding="utf-8"))
 
     if not _AUTO_SYNC_USERNAME or not _AUTO_SYNC_PASSWORD:
         raise HTTPException(
@@ -449,16 +508,16 @@ def _build_badge3_svg(profile: dict) -> str:
 
 
 @app.get("/api/player/{nickname}/badge.svg")
-async def get_player_badge_svg(nickname: str):
-    payload = await _load_or_auto_sync(nickname)
+async def get_player_badge_svg(nickname: str, refresh: bool = Query(default=False)):
+    payload = await _load_or_auto_sync(nickname, force=refresh)
     profile = _build_public_profile(payload)
     svg = _build_badge_svg(profile)
     return Response(content=svg, media_type="image/svg+xml")
 
 
 @app.get("/api/player/{nickname}/badge3.svg")
-async def get_player_badge3_svg(nickname: str):
-    payload = await _load_or_auto_sync(nickname)
+async def get_player_badge3_svg(nickname: str, refresh: bool = Query(default=False)):
+    payload = await _load_or_auto_sync(nickname, force=refresh)
     profile = _build_public_profile(payload)
     svg = _build_badge3_svg(profile)
     return Response(content=svg, media_type="image/svg+xml")
@@ -468,16 +527,16 @@ async def get_player_badge3_svg(nickname: str):
 # --- 짧은 alias URL (GitHub README 임베드용) ---
 
 @app.get("/badge/{nickname}")
-async def get_badge_short(nickname: str):
-    payload = await _load_or_auto_sync(nickname)
+async def get_badge_short(nickname: str, refresh: bool = Query(default=False)):
+    payload = await _load_or_auto_sync(nickname, force=refresh)
     profile = _build_public_profile(payload)
     svg = _build_badge_svg(profile)
     return Response(content=svg, media_type="image/svg+xml")
 
 
 @app.get("/badge3/{nickname}")
-async def get_badge3_short(nickname: str):
-    payload = await _load_or_auto_sync(nickname)
+async def get_badge3_short(nickname: str, refresh: bool = Query(default=False)):
+    payload = await _load_or_auto_sync(nickname, force=refresh)
     profile = _build_public_profile(payload)
     svg = _build_badge3_svg(profile)
     return Response(content=svg, media_type="image/svg+xml")
