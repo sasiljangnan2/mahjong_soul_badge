@@ -263,7 +263,7 @@ async def fetch_summary(username, password, target_nickname=None, recent_count=1
         else:
             resolved_account_id = login_account_id
 
-        summary = await build_summary(lobby, resolved_account_id, recent_count)
+        summary = await build_summary(lobby, target_nickname, recent_count)
         summary["meta"]["requested_recent_count"] = recent_count
         return summary
     finally:
