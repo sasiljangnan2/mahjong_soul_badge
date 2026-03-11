@@ -2,10 +2,17 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
+# 의존성 설치 (변경 없으면 캐시 재사용)
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY . .
+# 소스 코드만 선택적으로 복사 (data/ 제외)
+COPY *.py ./
+COPY assets/ ./assets/
+COPY ms/ ./ms/
+
+# 런타임 데이터 디렉토리 생성
+RUN mkdir -p data/players
 
 EXPOSE 8000
 
