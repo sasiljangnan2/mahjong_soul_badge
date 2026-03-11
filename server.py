@@ -197,12 +197,11 @@ def _save_summary(summary: dict, aliases: list[str] | None = None) -> dict:
 
     if nickname:
         index = _load_nickname_index()
-        index[nickname] = int(account_id)
         for alias in aliases or []:
             cleaned = (alias or "").strip()
             if cleaned:
                 index[cleaned] = int(account_id)
-
+        _save_nickname_index(index)
     return payload
 
 
