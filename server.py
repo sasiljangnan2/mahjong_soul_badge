@@ -97,7 +97,7 @@ async def _background_sync_all() -> None:
             if account_id in seen:
                 continue
             seen.add(account_id)
-            account = str(account_id)
+            account = str(_find_account_id_by_nickname(nickname))
             try:
                 summary = await fetch_summary(
                     username=_AUTO_SYNC_USERNAME,
