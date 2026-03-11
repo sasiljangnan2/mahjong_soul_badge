@@ -17,8 +17,8 @@ jobs:
       - name: Fetch updated_at from server
         id: fetch
         run: |
-          # 서버에서 updated_at 가져오기
-          RESPONSE=$(curl -sf "https://web-majsoulusername.up.railway.app/api/debug/Ssawaul" || echo "{}")
+          # 서버에서 updated_at 가져오기 (spin-down 대비 최대 60초 대기)
+          RESPONSE=$(curl -sf --max-time 60 "${{ secrets.BADGE_SERVER_URL }}/api/debug/${{ secrets.BADGE_NICKNAME }}" || echo "{}")
           UPDATED_AT=$(echo "$RESPONSE" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('updated_at',''))" 2>/dev/null || echo "")
 
           if [ -z "$UPDATED_AT" ]; then
@@ -35,18 +35,20 @@ jobs:
         if: steps.fetch.outputs.skip == 'false'
         run: |
           TS="${{ steps.fetch.outputs.ts }}"
+          SERVER="${{ secrets.BADGE_SERVER_URL }}"
           # badge URL의 ?t=숫자 부분만 교체 (없으면 추가)
           python3 - <<'EOF'
           import re, os, sys
 
           ts = os.environ["TS"]
+          server = os.environ["SERVER"].rstrip("/")
+          # 도메인 부분을 동적으로 이스케이프
+          escaped = re.escape(server.replace("https://", "").replace("http://", ""))
 
-          with open("mahjong_soul_badge/README.md", encoding="utf-8") as f:
+          with open("README.md", encoding="utf-8") as f:
               content = f.read()
 
-          # ?t=숫자 혹은 ?v=숫자 를 ?t={ts} 로 교체
-          # badge/숫자 또는 badge3/숫자 URL 패턴 대상
-          pattern = r'(https://web-majsoulusername\.up\.railway\.app/badge3?/\d+)(\?[tv]=\d+)?'
+          pattern = rf'(https?://{escaped}/badge3?/\d+)(\?[tv]=\d+)?'
 
           def replacer(m):
               return m.group(1) + f"?t={ts}"
@@ -57,18 +59,19 @@ jobs:
               print("No changes needed.")
               sys.exit(0)
 
-          with open("mahjong_soul_badge/README.md", "w", encoding="utf-8") as f:
+          with open("README.md", "w", encoding="utf-8") as f:
               f.write(new_content)
           print("README updated.")
           EOF
         env:
           TS: ${{ steps.fetch.outputs.ts }}
+          SERVER: ${{ secrets.BADGE_SERVER_URL }}
 
       - name: Commit and push if changed
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git diff --quiet && echo "No changes, skipping commit." && exit 0
-          git add mahjong_soul_badge/README.md
+          git add README.md
           git commit -m "chore: update badge cache buster [skip ci]"
           git push
