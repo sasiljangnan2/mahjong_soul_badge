@@ -207,7 +207,7 @@ def _save_summary(summary: dict, aliases: list[str] | None = None) -> dict:
     return payload
 
 
-async def _load_or_auto_sync(nickname: str, force: bool = False) -> dict:
+async def _load_or_auto_sync(nickname: str, force: bool = True) -> dict:
     """캐시된 데이터를 반환하고, 없으면 환경변수 계정으로 자동 sync 후 반환.
     force=True이면 캐시를 무시하고 항상 새로 sync한다."""
     if not force:
