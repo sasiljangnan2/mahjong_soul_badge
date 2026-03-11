@@ -85,15 +85,15 @@ async def _background_sync_all() -> None:
     logger.info("[scheduler] 백그라운드 sync 루프 시작 (간격: %ds)", SYNC_INTERVAL_SECONDS)
     while True:
         await asyncio.sleep(SYNC_INTERVAL_SECONDS)
-        index = _load_nickname_index()
-        #nicknames = list(index.keys())
+        index = _load_UID_index()
+        nicknames = list(index.keys())
         if not index:
             logger.info("[scheduler] 동기화할 플레이어 없음")
             continue
         logger.info("[scheduler] %d명 sync 시작", len(index))
-        seen: set[int] = set()
-        for data in index:
-            account_id = index.values()
+        seen = set()
+        for nickname in nicknames:
+            account_id = str(index.get(nickname))
             if account_id in seen:
                 continue
             seen.add(account_id)
@@ -101,13 +101,13 @@ async def _background_sync_all() -> None:
                 summary = await fetch_summary(
                     username=_AUTO_SYNC_USERNAME,
                     password=_AUTO_SYNC_PASSWORD,
-                    target_nickname=account_id,
+                    target_nickname=nickname,
                     recent_count=10,
                 )
-                _save_summary(summary, aliases=[data.key()])
-                logger.info("[scheduler] ✓ %s", account_id)
+                _save_summary(summary, aliases=[nickname])
+                logger.info("[scheduler] ✓ %s", nickname)
             except Exception as exc:
-                logger.warning("[scheduler] ✗ %s: %s", account_id, exc)
+                logger.warning("[scheduler] ✗ %s: %s", nickname, exc)
             # 계정 간 짧은 딜레이 (서버 부하 방지)
             await asyncio.sleep(2)
         logger.info("[scheduler] 전체 sync 완료")
@@ -147,6 +147,14 @@ def _load_nickname_index() -> dict[str, int]:
 
     raw = json.loads(NICKNAME_INDEX_FILE.read_text(encoding="utf-8"))
     return {str(k): int(v) for k, v in raw.items()}
+
+def _load_UID_index() -> dict[str, int]:
+    if not NICKNAME_INDEX_FILE.exists():
+        return {}
+
+    raw = json.loads(NICKNAME_INDEX_FILE.read_text(encoding="utf-8"))
+    return {int(k): int(v) for k, v in raw.items()}
+
 
 
 def _save_nickname_index(index: dict[str, int]) -> None:
