@@ -521,7 +521,7 @@ async def get_player_badge_svg(nickname: str, refresh: bool = Query(default=Fals
     return Response(
         content=svg,
         media_type="image/svg+xml",
-        headers={"Cache-Control": "max-age=60, must-revalidate"}
+        headers={"Cache-Control": "no-cache, no-store, must-revalidate"}
     )
 
 
@@ -548,7 +548,7 @@ async def get_badge_short(nickname: str, refresh: bool = Query(default=False)):
     return Response(
         content=svg,
         media_type="image/svg+xml",
-        headers={"Cache-Control": "max-age=60, must-revalidate"}
+        headers={"Cache-Control": "no-cache, no-store, must-revalidate"}
     )
 
 
@@ -560,5 +560,5 @@ async def get_badge3_short(nickname: str, refresh: bool = Query(default=False)):
     return Response(
         content=svg,
         media_type="image/svg+xml",
-        headers={"Cache-Control": "max-age=60, must-revalidate"}
+        headers={"Cache-Control": "no-cache, no-store, must-revalidate"}
     )
