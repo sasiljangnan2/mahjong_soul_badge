@@ -525,9 +525,10 @@ def _badge_response(request: Request, svg: str, updated_at: str) -> Response:
         last_modified = formatdate(usegmt=True)
 
     headers = {
-        # max-age=60: GitHub Camo는 no-cache를 무시하지만 max-age는 존중함.
-        # s-maxage=60: CDN 프록시도 60초마다 재검증.
-        "Cache-Control": "max-age=60, s-maxage=60, must-revalidate",
+        # max-age=1800: 브라우저 30분 캐시
+        # s-maxage=1800: GitHub Camo 등 CDN 프록시 30분마다 재검증 (mazassumnida 방식)
+        # stale-while-revalidate=60: 재검증 중에도 기존 캐시 즉시 반환
+        "Cache-Control": "max-age=1800, s-maxage=1800, stale-while-revalidate=60",
         "ETag": etag,
         "Last-Modified": last_modified,
     }
