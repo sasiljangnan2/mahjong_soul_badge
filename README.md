@@ -3,7 +3,7 @@
 > 작혼 전적을 GitHub README에 배지로 표시해주는 프로젝트입니다.
 
 [![badge preview](https://mahjong-soul-api.onrender.com/badge/127512551)](https://mahjong-soul-api.onrender.com/badge/127512551)
-[![badge preview](https://mahjong-soul-api.onrender.com/badge3/127512551?refresh=1)](https://mahjong-soul-api.onrender.com/badge3/127512551)
+[![badge preview](https://mahjong-soul-api.onrender.com/badge3/127512551)](https://mahjong-soul-api.onrender.com/badge3/127512551)
 ---
 
 ## 배지 사용 방법
