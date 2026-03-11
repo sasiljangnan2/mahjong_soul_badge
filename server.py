@@ -106,9 +106,9 @@ async def _background_sync_all() -> None:
                     recent_count=10,
                 )
                 _save_summary(summary, aliases=[nickname])
-                logger.info("[scheduler] ✓ %s", nickname)
+                logger.info("[scheduler] ✓ %s", account)
             except Exception as exc:
-                logger.warning("[scheduler] ✗ %s: %s", nickname, exc)
+                logger.warning("[scheduler] ✗ %s: %s", account, exc)
             # 계정 간 짧은 딜레이 (서버 부하 방지)
             await asyncio.sleep(2)
         logger.info("[scheduler] 전체 sync 완료")
