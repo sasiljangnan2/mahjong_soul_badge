@@ -73,7 +73,7 @@ _RANK_SCORE_RANGES: dict[tuple[int, int], tuple[int, int]] = {
     (5, 3): (4500, 9000),
 }
 
-SYNC_INTERVAL_SECONDS = int(os.environ.get("SYNC_INTERVAL", 3600))  # 기본 1시간
+SYNC_INTERVAL_SECONDS = int(os.environ.get("SYNC_INTERVAL", 60))  # 기본 1시간
 
 
 async def _background_sync_all() -> None:
@@ -86,22 +86,23 @@ async def _background_sync_all() -> None:
     while True:
         await asyncio.sleep(SYNC_INTERVAL_SECONDS)
         index = _load_nickname_index()
-        nicknames = list(index.values())
+        nicknames = list(index.keys())
         if not nicknames:
             logger.info("[scheduler] 동기화할 플레이어 없음")
             continue
         logger.info("[scheduler] %d명 sync 시작", len(nicknames))
-        seen: set[str] = set()
+        seen: set[int] = set()
         for nickname in nicknames:
             account_id = index.get(nickname)
             if account_id in seen:
                 continue
             seen.add(account_id)
+            account = str(account_id)
             try:
                 summary = await fetch_summary(
                     username=_AUTO_SYNC_USERNAME,
                     password=_AUTO_SYNC_PASSWORD,
-                    target_nickname=nickname,
+                    target_nickname=account,
                     recent_count=10,
                 )
                 _save_summary(summary, aliases=[nickname])
