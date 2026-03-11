@@ -73,7 +73,7 @@ _RANK_SCORE_RANGES: dict[tuple[int, int], tuple[int, int]] = {
     (5, 3): (4500, 9000),
 }
 
-SYNC_INTERVAL_SECONDS = int(os.environ.get("SYNC_INTERVAL", 3600))  # 기본 1시간
+SYNC_INTERVAL_SECONDS = int(os.environ.get("SYNC_INTERVAL", 60))  # 기본 1시간
 
 
 async def _background_sync_all() -> None:
@@ -86,29 +86,28 @@ async def _background_sync_all() -> None:
     while True:
         await asyncio.sleep(SYNC_INTERVAL_SECONDS)
         index = _load_nickname_index()
-        nicknames = list(index.keys())
-        if not nicknames:
+        #nicknames = list(index.keys())
+        if not index:
             logger.info("[scheduler] 동기화할 플레이어 없음")
             continue
-        logger.info("[scheduler] %d명 sync 시작", len(nicknames))
+        logger.info("[scheduler] %d명 sync 시작", len(index))
         seen: set[int] = set()
-        for nickname in nicknames:
-            account_id = index.get(nickname)
+        for data in index:
+            account_id = index.values()
             if account_id in seen:
                 continue
             seen.add(account_id)
-            account = str(_find_account_id_by_nickname(nickname))
             try:
                 summary = await fetch_summary(
                     username=_AUTO_SYNC_USERNAME,
                     password=_AUTO_SYNC_PASSWORD,
-                    target_nickname=account,
+                    target_nickname=account_id,
                     recent_count=10,
                 )
-                _save_summary(summary, aliases=[nickname])
-                logger.info("[scheduler] ✓ %s", account)
+                _save_summary(summary, aliases=[data.key()])
+                logger.info("[scheduler] ✓ %s", account_id)
             except Exception as exc:
-                logger.warning("[scheduler] ✗ %s: %s", account, exc)
+                logger.warning("[scheduler] ✗ %s: %s", account_id, exc)
             # 계정 간 짧은 딜레이 (서버 부하 방지)
             await asyncio.sleep(2)
         logger.info("[scheduler] 전체 sync 완료")
