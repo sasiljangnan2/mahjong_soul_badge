@@ -518,7 +518,11 @@ async def get_player_badge_svg(nickname: str, refresh: bool = Query(default=Fals
     payload = await _load_or_auto_sync(nickname, force=refresh)
     profile = _build_public_profile(payload)
     svg = _build_badge_svg(profile)
-    return Response(content=svg, media_type="image/svg+xml")
+    return Response(
+        content=svg,
+        media_type="image/svg+xml",
+        headers={"Cache-Control": "max-age=60, must-revalidate"}
+    )
 
 
 @app.get("/api/player/{nickname}/badge3.svg")
@@ -526,7 +530,11 @@ async def get_player_badge3_svg(nickname: str, refresh: bool = Query(default=Fal
     payload = await _load_or_auto_sync(nickname, force=refresh)
     profile = _build_public_profile(payload)
     svg = _build_badge3_svg(profile)
-    return Response(content=svg, media_type="image/svg+xml")
+    return Response(
+        content=svg,
+        media_type="image/svg+xml",
+        headers={"Cache-Control": "max-age=60, must-revalidate"}
+    )
 
 
 
@@ -537,7 +545,11 @@ async def get_badge_short(nickname: str, refresh: bool = Query(default=False)):
     payload = await _load_or_auto_sync(nickname, force=refresh)
     profile = _build_public_profile(payload)
     svg = _build_badge_svg(profile)
-    return Response(content=svg, media_type="image/svg+xml")
+    return Response(
+        content=svg,
+        media_type="image/svg+xml",
+        headers={"Cache-Control": "max-age=60, must-revalidate"}
+    )
 
 
 @app.get("/badge3/{nickname}")
@@ -545,4 +557,8 @@ async def get_badge3_short(nickname: str, refresh: bool = Query(default=False)):
     payload = await _load_or_auto_sync(nickname, force=refresh)
     profile = _build_public_profile(payload)
     svg = _build_badge3_svg(profile)
-    return Response(content=svg, media_type="image/svg+xml")
+    return Response(
+        content=svg,
+        media_type="image/svg+xml",
+        headers={"Cache-Control": "max-age=60, must-revalidate"}
+    )
