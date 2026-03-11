@@ -17,15 +17,23 @@ jobs:
       - name: Fetch updated_at from server
         id: fetch
         run: |
-          # 서버에서 updated_at 가져오기 (spin-down 대비 최대 60초 대기)
-          RESPONSE=$(curl -sf --max-time 60 "${{ secrets.BADGE_SERVER_URL }}/api/debug/${{ secrets.BADGE_NICKNAME }}" || echo "{}")
-          UPDATED_AT=$(echo "$RESPONSE" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('updated_at',''))" 2>/dev/null || echo "")
+          # Render 무료 플랜은 spin-down 후 재시작에 최대 60초 소요.
+          # 최대 3회 재시도, 각 30초 간격으로 시도.
+          RESPONSE="{}"
+          for i in 1 2 3; do
+            RESPONSE=$(curl -sf --max-time 90 "${{ secrets.BADGE_SERVER_URL }}/api/debug/${{ secrets.BADGE_NICKNAME }}" 2>/dev/null || echo "{}")
+            UPDATED_AT=$(echo "$RESPONSE" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('updated_at',''))" 2>/dev/null || echo "")
+            if [ -n "$UPDATED_AT" ]; then
+              break
+            fi
+            echo "Attempt $i failed, retrying in 30s..."
+            sleep 30
+          done
 
           if [ -z "$UPDATED_AT" ]; then
-            echo "Could not fetch updated_at, skipping."
+            echo "Could not fetch updated_at after retries, skipping."
             echo "skip=true" >> "$GITHUB_OUTPUT"
           else
-            # updated_at을 Unix timestamp로 변환
             TS=$(python3 -c "from datetime import datetime; s='$UPDATED_AT'; dt=datetime.fromisoformat(s); print(int(dt.timestamp()))")
             echo "ts=$TS" >> "$GITHUB_OUTPUT"
             echo "skip=false" >> "$GITHUB_OUTPUT"
@@ -68,6 +76,7 @@ jobs:
           SERVER: ${{ secrets.BADGE_SERVER_URL }}
 
       - name: Commit and push if changed
+        if: steps.fetch.outputs.skip == 'false'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
