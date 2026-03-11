@@ -1,11 +1,13 @@
 import asyncio
 import base64
+import hashlib
 import json
 import logging
 import mimetypes
 import os   
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
+from email.utils import formatdate
 from functools import lru_cache
 from html import escape
 from pathlib import Path
@@ -24,7 +26,7 @@ if _env_file.exists():
 _AUTO_SYNC_USERNAME: str = os.environ.get("MAJSOUL_USERNAME", "")
 _AUTO_SYNC_PASSWORD: str = os.environ.get("MAJSOUL_PASSWORD", "")
 
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
 
@@ -513,52 +515,58 @@ def _build_badge3_svg(profile: dict) -> str:
     )
 
 
+def _badge_response(request: Request, svg: str, updated_at: str) -> Response:
+    """ETag/Last-Modified 조건부 요청을 처리하여 304 or 200 반환."""
+    etag = '"' + hashlib.md5(svg.encode()).hexdigest() + '"'
+    try:
+        dt = datetime.fromisoformat(updated_at)
+        last_modified = formatdate(dt.timestamp(), usegmt=True)
+    except Exception:
+        last_modified = formatdate(usegmt=True)
+
+    headers = {
+        "Cache-Control": "no-cache, must-revalidate",
+        "ETag": etag,
+        "Last-Modified": last_modified,
+        "Pragma": "no-cache",
+    }
+
+    if request.headers.get("If-None-Match") == etag:
+        return Response(status_code=304, headers=headers)
+
+    return Response(content=svg, media_type="image/svg+xml", headers=headers)
+
+
 @app.get("/api/player/{nickname}/badge.svg")
-async def get_player_badge_svg(nickname: str, refresh: bool = Query(default=False)):
+async def get_player_badge_svg(request: Request, nickname: str, refresh: bool = Query(default=False)):
     payload = await _load_or_auto_sync(nickname, force=refresh)
     profile = _build_public_profile(payload)
     svg = _build_badge_svg(profile)
-    return Response(
-        content=svg,
-        media_type="image/svg+xml",
-        headers={"Cache-Control": "no-cache, no-store, must-revalidate"}
-    )
+    return _badge_response(request, svg, payload.get("updated_at", ""))
 
 
 @app.get("/api/player/{nickname}/badge3.svg")
-async def get_player_badge3_svg(nickname: str, refresh: bool = Query(default=False)):
+async def get_player_badge3_svg(request: Request, nickname: str, refresh: bool = Query(default=False)):
     payload = await _load_or_auto_sync(nickname, force=refresh)
     profile = _build_public_profile(payload)
     svg = _build_badge3_svg(profile)
-    return Response(
-        content=svg,
-        media_type="image/svg+xml",
-        headers={"Cache-Control": "no-cache, no-store, must-revalidate"}
-    )
+    return _badge_response(request, svg, payload.get("updated_at", ""))
 
 
 
 # --- 짧은 alias URL (GitHub README 임베드용) ---
 
 @app.get("/badge/{nickname}")
-async def get_badge_short(nickname: str, refresh: bool = Query(default=False)):
+async def get_badge_short(request: Request, nickname: str, refresh: bool = Query(default=False)):
     payload = await _load_or_auto_sync(nickname, force=refresh)
     profile = _build_public_profile(payload)
     svg = _build_badge_svg(profile)
-    return Response(
-        content=svg,
-        media_type="image/svg+xml",
-        headers={"Cache-Control": "no-cache, no-store, must-revalidate"}
-    )
+    return _badge_response(request, svg, payload.get("updated_at", ""))
 
 
 @app.get("/badge3/{nickname}")
-async def get_badge3_short(nickname: str, refresh: bool = Query(default=False)):
+async def get_badge3_short(request: Request, nickname: str, refresh: bool = Query(default=False)):
     payload = await _load_or_auto_sync(nickname, force=refresh)
     profile = _build_public_profile(payload)
     svg = _build_badge3_svg(profile)
-    return Response(
-        content=svg,
-        media_type="image/svg+xml",
-        headers={"Cache-Control": "no-cache, no-store, must-revalidate"}
-    )
+    return _badge_response(request, svg, payload.get("updated_at", ""))
