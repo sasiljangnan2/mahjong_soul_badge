@@ -73,7 +73,7 @@ _RANK_SCORE_RANGES: dict[tuple[int, int], tuple[int, int]] = {
     (5, 3): (4500, 9000),
 }
 
-SYNC_INTERVAL_SECONDS = int(os.environ.get("SYNC_INTERVAL", 61))  # 기본 1시간
+SYNC_INTERVAL_SECONDS = int(os.environ.get("SYNC_INTERVAL", 3600))  # 기본 1시간
 
 
 async def _background_sync_all() -> None:
