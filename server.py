@@ -518,34 +518,53 @@ def _build_badge3_svg(profile: dict) -> str:
         icon_data_uri = _3rank_icon_data_uri(int((profile.get("rank_3p") or {}).get("tier") or 0))
     )
 
-@app.get("/api/player/{nickname}/badge.png")
-async def get_player_badge_png(nickname: str, refresh: bool = Query(default=False)):
+
+@app.get("/api/player/{nickname}/badge.svg")
+async def get_player_badge_svg(nickname: str, refresh: bool = Query(default=False)):
     payload = await _load_or_auto_sync(nickname, force=refresh)
     profile = _build_public_profile(payload)
     svg = _build_badge_svg(profile)
-    png_bytes = cairosvg.svg2png(bytestring=svg.encode("utf-8"))
-    return StreamingResponse(io.BytesIO(png_bytes), media_type="image/png", headers={"Cache-Control": "max-age=60, must-revalidate"})
+    return Response(
+        content=svg,
+        media_type="image/svg+xml",
+        headers={"Cache-Control": "max-age=60, must-revalidate"}
+    )
 
-@app.get("/api/player/{nickname}/badge3.png")
-async def get_player_badge3_png(nickname: str, refresh: bool = Query(default=False)):
+
+@app.get("/api/player/{nickname}/badge3.svg")
+async def get_player_badge3_svg(nickname: str, refresh: bool = Query(default=False)):
     payload = await _load_or_auto_sync(nickname, force=refresh)
     profile = _build_public_profile(payload)
     svg = _build_badge3_svg(profile)
-    png_bytes = cairosvg.svg2png(bytestring=svg.encode("utf-8"))
-    return StreamingResponse(io.BytesIO(png_bytes), media_type="image/png", headers={"Cache-Control": "max-age=60, must-revalidate"})
+    return Response(
+        content=svg,
+        media_type="image/svg+xml",
+        headers={"Cache-Control": "max-age=60, must-revalidate"}
+    )
 
-@app.get("/badge/{nickname}.png")
-async def get_badge_short_png(nickname: str, refresh: bool = Query(default=False)):
+
+
+# --- 짧은 alias URL (GitHub README 임베드용) ---
+
+@app.get("/badge/{nickname}")
+async def get_badge_short(nickname: str, refresh: bool = Query(default=False)):
     payload = await _load_or_auto_sync(nickname, force=refresh)
     profile = _build_public_profile(payload)
     svg = _build_badge_svg(profile)
-    png_bytes = cairosvg.svg2png(bytestring=svg.encode("utf-8"))
-    return StreamingResponse(io.BytesIO(png_bytes), media_type="image/png", headers={"Cache-Control": "max-age=60, must-revalidate"})
+    return Response(
+        content=svg,
+        media_type="image/svg+xml",
+        headers={"Cache-Control": "max-age=60, must-revalidate"}
+    )
 
-@app.get("/badge3/{nickname}.png")
-async def get_badge3_short_png(nickname: str, refresh: bool = Query(default=False)):
+
+@app.get("/badge3/{nickname}")
+async def get_badge3_short(nickname: str, refresh: bool = Query(default=False)):
     payload = await _load_or_auto_sync(nickname, force=refresh)
     profile = _build_public_profile(payload)
     svg = _build_badge3_svg(profile)
-    png_bytes = cairosvg.svg2png(bytestring=svg.encode("utf-8"))
-    return StreamingResponse(io.BytesIO(png_bytes), media_type="image/png", headers={"Cache-Control": "max-age=60, must-revalidate"})
+    return Response(
+        content=svg,
+        media_type="image/svg+xml",
+        headers={"Cache-Control": "max-age=60, must-revalidate"}
+    )
