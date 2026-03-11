@@ -514,7 +514,7 @@ def _build_badge3_svg(profile: dict) -> str:
 
 
 @app.get("/api/player/{nickname}/badge.svg")
-async def get_player_badge_svg(nickname: str, refresh: bool = Query(default=False)):
+async def get_player_badge_svg(nickname: str, refresh: bool = Query(default=True)):
     payload = await _load_or_auto_sync(nickname, force=refresh)
     profile = _build_public_profile(payload)
     svg = _build_badge_svg(profile)
@@ -526,14 +526,14 @@ async def get_player_badge_svg(nickname: str, refresh: bool = Query(default=Fals
 
 
 @app.get("/api/player/{nickname}/badge3.svg")
-async def get_player_badge3_svg(nickname: str, refresh: bool = Query(default=False)):
+async def get_player_badge3_svg(nickname: str, refresh: bool = Query(default=True)):
     payload = await _load_or_auto_sync(nickname, force=refresh)
     profile = _build_public_profile(payload)
     svg = _build_badge3_svg(profile)
     return Response(
         content=svg,
         media_type="image/svg+xml",
-        headers={"Cache-Control": "max-age=60, must-revalidate"}
+        headers={"Cache-Control": "no-cache, no-store, must-revalidate"}
     )
 
 
@@ -541,7 +541,7 @@ async def get_player_badge3_svg(nickname: str, refresh: bool = Query(default=Fal
 # --- 짧은 alias URL (GitHub README 임베드용) ---
 
 @app.get("/badge/{nickname}")
-async def get_badge_short(nickname: str, refresh: bool = Query(default=False)):
+async def get_badge_short(nickname: str, refresh: bool = Query(default=True)):
     payload = await _load_or_auto_sync(nickname, force=refresh)
     profile = _build_public_profile(payload)
     svg = _build_badge_svg(profile)
@@ -553,7 +553,7 @@ async def get_badge_short(nickname: str, refresh: bool = Query(default=False)):
 
 
 @app.get("/badge3/{nickname}")
-async def get_badge3_short(nickname: str, refresh: bool = Query(default=False)):
+async def get_badge3_short(nickname: str, refresh: bool = Query(default=True)):
     payload = await _load_or_auto_sync(nickname, force=refresh)
     profile = _build_public_profile(payload)
     svg = _build_badge3_svg(profile)
