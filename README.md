@@ -3,7 +3,7 @@
 > 작혼 전적을 GitHub README에 배지로 표시해주는 프로젝트입니다.
 
 [![badge preview](https://web-majsoulusername.up.railway.app/badge/127512551)](https://web-majsoulusername.up.railway.app/badge/127512551)
-[![badge preview](https://web-majsoulusername.up.railway.app/badge3/127512551)](https://web-majsoulusername.up.railway.app/badge3/127512551)
+[![badge preview](https://web-majsoulusername.up.railway.app/badge3/127512551?refresh=1)](https://web-majsoulusername.up.railway.app/badge3/127512551)
 ---
 
 ## 배지 사용 방법
@@ -12,13 +12,13 @@
 
 **4인마작 배지:**
 ```markdown
-![Mahjong Soul Badge](https://mahjong-soul-api.onrender.com/badge/<작혼_UID>)
+![Mahjong Soul Badge](https://web-majsoulusername.up.railway.app/badge/<작혼_UID>)
 ```
 
 
 **3인마작 배지:**
 ```markdown
-![Mahjong Soul 3P Badge](https://https://mahjong-soul-api.onrender.com/badge3/<작혼_UID>)
+![Mahjong Soul 3P Badge](https://web-majsoulusername.up.railway.app/badge3/<작혼_UID>)
 ```
 
 ---
@@ -28,7 +28,7 @@
 - 배지 데이터는 서버에서 **1시간마다 자동으로 갱신**됩니다.
 
 ```
-https://mahjong-soul-api.onrender.com/badge/<작혼_UID>?refresh=1
+https://https://web-majsoulusername.up.railway.app/badge/<작혼_UID>?refresh=1
 ```
 
 > `?refresh=1`은 작혼 서버에 직접 요청하므로 응답이 느릴 수 있습니다.
