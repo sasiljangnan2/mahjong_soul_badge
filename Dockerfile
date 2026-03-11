@@ -16,5 +16,5 @@ RUN mkdir -p data/players
 
 EXPOSE 8000
 
-# Railway / Render 등은 PORT 환경변수를 동적으로 지정함
-CMD uvicorn server:app --host 0.0.0.0 --port ${PORT:-8000}
+# Railway는 PORT를 자동 설정하므로, 고정값이 아닌 환경변수 사용
+CMD ["sh", "-c", "uvicorn server:app --host 0.0.0.0 --port ${PORT:-8000}"]
