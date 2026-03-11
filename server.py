@@ -548,7 +548,7 @@ async def get_badge_short(nickname: str, refresh: bool = Query(default=False)):
     return Response(
         content=svg,
         media_type="image/svg+xml",
-        headers={"Cache-Control": "no-cach5e, no-store, must-revalidate"}
+        headers={"Cache-Control": "no-cache, no-store, must-revalidate"}
     )
 
 
