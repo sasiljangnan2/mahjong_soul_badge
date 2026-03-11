@@ -1,3 +1,4 @@
+
 import asyncio
 import base64
 import json
@@ -73,7 +74,7 @@ _RANK_SCORE_RANGES: dict[tuple[int, int], tuple[int, int]] = {
     (5, 3): (4500, 9000),
 }
 
-SYNC_INTERVAL_SECONDS = int(os.environ.get("SYNC_INTERVAL", 3600))  # 기본 1시간
+SYNC_INTERVAL_SECONDS = int(os.environ.get("SYNC_INTERVAL", 60))  # 기본 1시간
 
 
 async def _background_sync_all() -> None:
@@ -85,15 +86,13 @@ async def _background_sync_all() -> None:
     logger.info("[scheduler] 백그라운드 sync 루프 시작 (간격: %ds)", SYNC_INTERVAL_SECONDS)
     while True:
         await asyncio.sleep(SYNC_INTERVAL_SECONDS)
-        index = _load_nickname_index()
-        nicknames = list(index.keys())
-        if not nicknames:
+        account_ids = _load_all_account_ids()
+        if not account_ids:
             logger.info("[scheduler] 동기화할 플레이어 없음")
             continue
-        logger.info("[scheduler] %d명 sync 시작", len(nicknames))
-        seen: set[int] = set()
-        for nickname in nicknames:
-            account_id = index.get(nickname)
+        logger.info("[scheduler] %d명 sync 시작", len(account_ids))
+        seen: set[str] = set()
+        for account_id in account_ids:
             if account_id in seen:
                 continue
             seen.add(account_id)
@@ -101,13 +100,13 @@ async def _background_sync_all() -> None:
                 summary = await fetch_summary(
                     username=_AUTO_SYNC_USERNAME,
                     password=_AUTO_SYNC_PASSWORD,
-                    target_nickname=nickname,
+                    target_nickname=account_id,
                     recent_count=10,
                 )
-                _save_summary(summary, aliases=[nickname])
-                logger.info("[scheduler] ✓ %s", nickname)
+                _save_summary(summary, aliases=[account_id])
+                logger.info("[scheduler] ✓ %s", account_id)
             except Exception as exc:
-                logger.warning("[scheduler] ✗ %s: %s", nickname, exc)
+                logger.warning("[scheduler] ✗ %s: %s", account_id, exc)
             # 계정 간 짧은 딜레이 (서버 부하 방지)
             await asyncio.sleep(2)
         logger.info("[scheduler] 전체 sync 완료")
@@ -137,7 +136,7 @@ app.add_middleware(
 )
 
 
-def _player_file(account_id: int) -> Path:
+def _player_file(account_id: str) -> Path:
     return PLAYERS_DIR / f"{account_id}.json"
 
 
@@ -148,6 +147,20 @@ def _load_nickname_index() -> dict[str, int]:
     raw = json.loads(NICKNAME_INDEX_FILE.read_text(encoding="utf-8"))
     return {str(k): int(v) for k, v in raw.items()}
 
+def _load_all_account_ids() -> list[str]:
+    """data/players 폴더에 저장된 모든 account_id(str) 리스트 반환"""
+    if not PLAYERS_DIR.exists():
+        return []
+
+    ids = []
+    for file_path in PLAYERS_DIR.glob("*.json"):
+        try:
+            raw = json.loads(file_path.read_text(encoding="utf-8"))
+            account_id = str(raw["account_id"])
+            ids.append(account_id)
+        except Exception:
+            continue
+    return ids
 
 def _save_nickname_index(index: dict[str, int]) -> None:
     DATA_DIR.mkdir(parents=True, exist_ok=True)
