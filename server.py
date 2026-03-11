@@ -525,10 +525,11 @@ def _badge_response(request: Request, svg: str, updated_at: str) -> Response:
         last_modified = formatdate(usegmt=True)
 
     headers = {
-        "Cache-Control": "no-cache, must-revalidate",
+        # max-age=60: GitHub Camo는 no-cache를 무시하지만 max-age는 존중함.
+        # s-maxage=60: CDN 프록시도 60초마다 재검증.
+        "Cache-Control": "max-age=60, s-maxage=60, must-revalidate",
         "ETag": etag,
         "Last-Modified": last_modified,
-        "Pragma": "no-cache",
     }
 
     if request.headers.get("If-None-Match") == etag:
@@ -570,3 +571,28 @@ async def get_badge3_short(request: Request, nickname: str, refresh: bool = Quer
     profile = _build_public_profile(payload)
     svg = _build_badge3_svg(profile)
     return _badge_response(request, svg, payload.get("updated_at", ""))
+
+
+# --- 디버그: 저장된 raw 데이터 확인 ---
+
+from fastapi.responses import JSONResponse
+
+@app.get("/api/debug/{nickname}")
+async def debug_player_data(nickname: str):
+    """저장된 JSON 데이터를 그대로 반환 (recent_games 구조 확인용)."""
+    account_id = _find_account_id_by_nickname(nickname)
+    if account_id is None:
+        raise HTTPException(status_code=404, detail="Not found in index")
+    file_path = _player_file(account_id)
+    if not file_path.exists():
+        raise HTTPException(status_code=404, detail="Data file not found")
+    raw = json.loads(file_path.read_text(encoding="utf-8"))
+    recent = raw.get("summary", {}).get("recent_games", {})
+    return JSONResponse({
+        "updated_at": raw.get("updated_at"),
+        "nickname": raw.get("nickname"),
+        "four_player_count": len(recent.get("four_player") or []),
+        "three_player_count": len(recent.get("three_player") or []),
+        "four_player_sample": (recent.get("four_player") or [])[:3],
+        "three_player_sample": (recent.get("three_player") or [])[:3],
+    })
