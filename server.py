@@ -79,18 +79,18 @@ SYNC_INTERVAL_SECONDS = int(os.environ.get("SYNC_INTERVAL", 60))  # 기본 1시�
 async def _background_sync_all() -> None:
     """알려진 모든 플레이어를 SYNC_INTERVAL_SECONDS 마다 재동기화한다."""
     if not _AUTO_SYNC_USERNAME or not _AUTO_SYNC_PASSWORD:
-        logger.info("[scheduler] MAJSOUL_USERNAME/PASSWORD 미설정 — 자동 sync 비활성화")
+        logger.warning("[scheduler] MAJSOUL_USERNAME/PASSWORD 미설정 — 자동 sync 비활성화")
         return
 
-    logger.info("[scheduler] 백그라운드 sync 루프 시작 (간격: %ds)", SYNC_INTERVAL_SECONDS)
+    logger.warning("[scheduler] 백그라운드 sync 루프 시작 (간격: %ds)", SYNC_INTERVAL_SECONDS)
     while True:
         await asyncio.sleep(SYNC_INTERVAL_SECONDS)
-        index = _load_UID_index()
+        index = _load_nickname_index()
         nicknames = list(index.keys())
         if not index:
-            logger.info("[scheduler] 동기화할 플레이어 없음")
+            logger.warning("[scheduler] 동기화할 플레이어 없음")
             continue
-        logger.info("[scheduler] %d명 sync 시작", len(index))
+        logger.warning("[scheduler] %d명 sync 시작", len(index))
         seen = set()
         for nickname in nicknames:
             account_id = str(index.get(nickname))
@@ -105,12 +105,12 @@ async def _background_sync_all() -> None:
                     recent_count=10,
                 )
                 _save_summary(summary, aliases=[nickname])
-                logger.info("[scheduler] ✓ %s", nickname)
+                logger.warning("[scheduler] ✓ %s", nickname)
             except Exception as exc:
                 logger.warning("[scheduler] ✗ %s: %s", nickname, exc)
             # 계정 간 짧은 딜레이 (서버 부하 방지)
             await asyncio.sleep(2)
-        logger.info("[scheduler] 전체 sync 완료")
+        logger.warning("[scheduler] 전체 sync 완료")
 
 
 @asynccontextmanager
@@ -202,7 +202,6 @@ def _save_summary(summary: dict, aliases: list[str] | None = None) -> dict:
             cleaned = (alias or "").strip()
             if cleaned:
                 index[cleaned] = int(account_id)
-        _save_nickname_index(index)
 
     return payload
 
