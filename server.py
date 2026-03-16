@@ -380,18 +380,18 @@ def _build_badge_svg_mode(
     if not tier_name:
         tier_name = "등급"
 
-    visible_stars = min(max(star, 0), 5)
-    # 별을 하나씩 나타나도록 SVG 생성
+    visible_stars = min(max(star, 0), 3)
+    # 별을 하나씩 나타나도록 SVG 생성 (중앙 정렬)
     stars_svg = ""
+    star_width = 15  # 각 별의 너비
+    total_width = visible_stars * star_width
+    center_x = 268
+    start_x = center_x - (total_width / 2)
+    
     for i in range(visible_stars):
         delay = 1.1 + (i * 0.15)
-        star_x = 268 - (visible_stars * 5) + (i * 10)
-        stars_svg += f"<text x='{star_x}' y='38' fill='#fff4c5' font-size='16' text-anchor='middle' font-family='Segoe UI, Malgun Gothic, sans-serif' opacity='0'>★<animate attributeName='opacity' from='0' to='1' dur='0.2s' begin='{delay}s' fill='freeze'/></text>"
-    
-    if star > 5:
-        delay = 1.1 + (visible_stars * 0.15)
-        star_suffix_x = 268 + (visible_stars * 5)
-        stars_svg += f"<text x='{star_suffix_x}' y='38' fill='#fff4c5' font-size='14' text-anchor='start' font-family='Segoe UI, Malgun Gothic, sans-serif' opacity='0'>x{star}<animate attributeName='opacity' from='0' to='1' dur='0.2s' begin='{delay}s' fill='freeze'/></text>"
+        star_x = start_x + (i * star_width) + (star_width / 2)
+        stars_svg += f"<text x='{star_x:.1f}' y='38' fill='#fff4c5' font-size='16' text-anchor='middle' font-family='Segoe UI, Malgun Gothic, sans-serif' opacity='0'>★<animate attributeName='opacity' from='0' to='1' dur='0.2s' begin='{delay}s' fill='freeze'/></text>"
     
     star_text = ""  # 더 이상 사용 안 함
 
@@ -502,7 +502,7 @@ def _build_badge_svg_mode(
     </g>
     <!-- Rank Section - Background & Gauge -->
     <g opacity='0'>
-      <animate attributeName='opacity' from='0' to='1' dur='0.3s' begin='1.1s' fill='freeze'/>
+      <animate attributeName='opacity' from='0' to='1' dur='0.3s' begin='0.4' fill='freeze'/>
       <rect x='230' y='22' width='76' height='24' rx='12' fill='rgba(255,255,255,0.22)' stroke='rgba(255,255,255,0.48)'/>
       {gauge_svg}
     </g>
@@ -524,7 +524,7 @@ def _build_badge_svg_mode(
     </g>
     <!-- Graph Line and Points -->
     <polyline points='{polyline}' fill='none' stroke='url(#lineg)' stroke-width='3' stroke-linecap='round' stroke-linejoin='round' stroke-dasharray='1000' stroke-dashoffset='1000'>
-      <animate attributeName='stroke-dashoffset' from='1000' to='0' dur='3.5s' begin='1.3s' fill='freeze'/>
+      <animate attributeName='stroke-dashoffset' from='1000' to='0' dur='3s' begin='1.3s' fill='freeze'/>
     </polyline>
     {point_dots}
 </svg>"""
