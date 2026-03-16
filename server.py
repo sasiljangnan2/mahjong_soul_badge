@@ -456,10 +456,12 @@ def _build_badge_svg_mode(
             coords.append((x, y))
 
         polyline = " ".join(f"{x:.1f},{y:.1f}" for x, y in coords)
-        polyline_length = len(coords) * 50  # polyline 길이 추정값
         for idx, (x, y) in enumerate(coords):
             delay = 0.5 + (idx * 0.08)  # 각 점마다 지연
-            point_dots += f"<circle cx='{x:.1f}' cy='{y:.1f}' r='3.6' fill='#fff6b0' stroke='#ffffff' stroke-width='1.2' class='animated-dot' style='animation-delay: {delay}s'/>"
+            point_dots += f"""<circle cx='{x:.1f}' cy='{y:.1f}' r='3.6' fill='#fff6b0' stroke='#ffffff' stroke-width='1.2'>
+      <animate attributeName='opacity' values='0;1;1' keyTimes='0;0.5;1' dur='0.4s' begin='{delay}s' fill='freeze'/>
+      <animate attributeName='r' values='1.2;5.5;3.6' keyTimes='0;0.5;1' dur='0.4s' begin='{delay}s' fill='freeze'/>
+    </circle>"""
 
     return f"""<svg xmlns='http://www.w3.org/2000/svg' width='450' height='200' role='img' aria-label='Majsoul profile badge'>
   <defs>
@@ -471,37 +473,6 @@ def _build_badge_svg_mode(
             <stop offset='0%' stop-color='{theme["line_start"]}'/>
             <stop offset='100%' stop-color='{theme["line_end"]}'/>
         </linearGradient>
-    <style>
-      @keyframes drawLine {{
-        from {{
-          stroke-dashoffset: 500;
-        }}
-        to {{
-          stroke-dashoffset: 0;
-        }}
-      }}
-      @keyframes popDot {{
-        0% {{
-          opacity: 0;
-          r: 1.2;
-        }}
-        50% {{
-          opacity: 1;
-          r: 5.5;
-        }}
-        100% {{
-          opacity: 1;
-          r: 3.6;
-        }}
-      }}
-      .animated-line {{
-        stroke-dasharray: 500;
-        animation: drawLine 0.8s ease-out forwards;
-      }}
-      .animated-dot {{
-        animation: popDot 0.4s ease-out forwards;
-      }}
-    </style>
   </defs>
     <rect width='450' height='200' rx='16' fill='url(#g)'/>
         <rect x='8' y='8' width='434' height='184' rx='12' fill='{theme["panel"]}'/>
@@ -522,7 +493,11 @@ def _build_badge_svg_mode(
     <rect x='{chart_x}' y='{chart_y}' width='{chart_w}' height='{chart_h}' rx='8' fill='rgba(255,255,255,0.14)'/>
     {rank_grid_lines}
     {rank_labels}
-    <polyline points='{polyline}' fill='none' stroke='url(#lineg)' stroke-width='3' stroke-linecap='round' stroke-linejoin='round' class='animated-line'/>
+    <g>
+      <polyline points='{polyline}' fill='none' stroke='url(#lineg)' stroke-width='3' stroke-linecap='round' stroke-linejoin='round' opacity='0'>
+        <animate attributeName='opacity' from='0' to='1' dur='0.8s' begin='0s' fill='freeze'/>
+      </polyline>
+    </g>
     {point_dots}
 </svg>"""
 
