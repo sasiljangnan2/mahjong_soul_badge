@@ -494,7 +494,7 @@ def _build_badge_svg_mode(
     {rank_grid_lines}
     {rank_labels}
     <polyline points='{polyline}' fill='none' stroke='url(#lineg)' stroke-width='3' stroke-linecap='round' stroke-linejoin='round' stroke-dasharray='1000' stroke-dashoffset='1000'>
-      <animate attributeName='stroke-dashoffset' from='1000' to='0' dur='2.5s' begin='0.8s' fill='freeze'/>
+      <animate attributeName='stroke-dashoffset' from='1000' to='0' dur='3.5s' begin='0.8s' fill='freeze'/>
     </polyline>
     {point_dots}
 </svg>"""
