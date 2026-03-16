@@ -381,9 +381,19 @@ def _build_badge_svg_mode(
         tier_name = "등급"
 
     visible_stars = min(max(star, 0), 5)
-    star_text = "★" * visible_stars
+    # 별을 하나씩 나타나도록 SVG 생성
+    stars_svg = ""
+    for i in range(visible_stars):
+        delay = 1.1 + (i * 0.15)
+        star_x = 268 - (visible_stars * 5) + (i * 10)
+        stars_svg += f"<text x='{star_x}' y='38' fill='#fff4c5' font-size='16' text-anchor='middle' font-family='Segoe UI, Malgun Gothic, sans-serif' opacity='0'>★<animate attributeName='opacity' from='0' to='1' dur='0.2s' begin='{delay}s' fill='freeze'/></text>"
+    
     if star > 5:
-        star_text += f"x{star}"
+        delay = 1.1 + (visible_stars * 0.15)
+        star_suffix_x = 268 + (visible_stars * 5)
+        stars_svg += f"<text x='{star_suffix_x}' y='38' fill='#fff4c5' font-size='14' text-anchor='start' font-family='Segoe UI, Malgun Gothic, sans-serif' opacity='0'>x{star}<animate attributeName='opacity' from='0' to='1' dur='0.2s' begin='{delay}s' fill='freeze'/></text>"
+    
+    star_text = ""  # 더 이상 사용 안 함
 
     # Gauge progress bar
     score_int = 0
@@ -404,7 +414,7 @@ def _build_badge_svg_mode(
         gauge_svg = (
             f"<rect x='{gx}' y='{gy}' width='{gw}' height='{gh}' rx='4' fill='rgba(255,255,255,0.22)'/>"
             f"<rect x='{gx}' y='{gy}' width='0' height='{gh}' rx='4' fill='{gauge_color}' fill-opacity='0.85'>"
-            f"<animate attributeName='width' from='0' to='{fill_w:.1f}' dur='0.8s' begin='0.5s' fill='freeze'/>"
+            f"<animate attributeName='width' from='0' to='{fill_w:.1f}' dur='0.8s' begin='1.1s' fill='freeze'/>"
             f"</rect>"
             f"<text x='{gx + gw / 2 - 1}' y='{gy - 10}' text-anchor='middle' fill='rgba(234,255,242,0.88)' font-size='14' "
             f"font-family='Segoe UI, Malgun Gothic, sans-serif'>{score_int}/{cap_score} </text>"
@@ -490,9 +500,9 @@ def _build_badge_svg_mode(
       <text x='30' y='20' fill='#f8fff9' font-size='12' text-anchor='middle' font-family='Segoe UI, Malgun Gothic, sans-serif'>{escape(avatar_text)}</text>
       <text x='96' y='84' fill='#eafff2' font-size='20' font-family='Segoe UI, Malgun Gothic, sans-serif'>{escape(subtitle1)}</text>
     </g>
-    <!-- Rank Section - Background -->
+    <!-- Rank Section - Background & Gauge -->
     <g opacity='0'>
-      <animate attributeName='opacity' from='0' to='1' dur='0.3s' begin='0.5s' fill='freeze'/>
+      <animate attributeName='opacity' from='0' to='1' dur='0.3s' begin='1.1s' fill='freeze'/>
       <rect x='230' y='22' width='76' height='24' rx='12' fill='rgba(255,255,255,0.22)' stroke='rgba(255,255,255,0.48)'/>
       {gauge_svg}
     </g>
@@ -502,11 +512,8 @@ def _build_badge_svg_mode(
       <rect x='337' y='15' width='94' height='94' rx='12' fill='rgba(255,255,255,0.18)' stroke='rgba(255,255,255,0.45)'/>
       <image x='340' y='17' width='90' height='90' href='{icon_data_uri}' preserveAspectRatio='xMidYMid meet'/>
     </g>
-    <!-- Rank Section - Stars -->
-    <g opacity='0'>
-      <animate attributeName='opacity' from='0' to='1' dur='0.3s' begin='1.1s' fill='freeze'/>
-      <text x='268' y='38' fill='#fff4c5' font-size='16' text-anchor='middle' font-family='Segoe UI, Malgun Gothic, sans-serif'>{escape(star_text or '-')}</text>
-    </g>
+    <!-- Stars -->
+    {stars_svg}
     <!-- Chart Section -->
     <g opacity='0'>
       <animate attributeName='opacity' from='0' to='1' dur='0.3s' begin='1s' fill='freeze'/>
