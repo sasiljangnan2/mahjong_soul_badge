@@ -6,7 +6,7 @@ cd /d "%ROOT%"
 
 if not exist ".venv\Scripts\python.exe" (
     echo [1/3] Creating virtual environment...
-    py -3 -m venv .venv
+    python -m venv .venv
 )
 
 echo [2/3] Installing dependencies...

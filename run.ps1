@@ -9,7 +9,7 @@ $venvPip = Join-Path $venvPath "Scripts\pip.exe"
 
 if (-not (Test-Path $venvPython)) {
     Write-Host "[1/3] Creating virtual environment..."
-    py -3 -m venv $venvPath
+    python -m venv $venvPath
 }
 
 Write-Host "[2/3] Installing dependencies..."
