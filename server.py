@@ -457,7 +457,7 @@ def _build_badge_svg_mode(
 
         polyline = " ".join(f"{x:.1f},{y:.1f}" for x, y in coords)
         for idx, (x, y) in enumerate(coords):
-            delay = 0.8 + (idx * 0.2)  # 각 점마다 지연
+            delay = 1.3 + (idx * 0.2)  # 각 점마다 지연
             point_dots += f"""<circle cx='{x:.1f}' cy='{y:.1f}' r='3.6' fill='#fff6b0' stroke='#ffffff' stroke-width='1.2' opacity='0'>
       <animate attributeName='opacity' values='0;1;1' keyTimes='0;0.5;1' dur='0.8s' begin='{delay}s' fill='freeze'/>
       <animate attributeName='r' values='1.2;5.5;3.6' keyTimes='0;0.5;1' dur='0.8s' begin='{delay}s' fill='freeze'/>
@@ -473,28 +473,41 @@ def _build_badge_svg_mode(
             <stop offset='0%' stop-color='{theme["line_start"]}'/>
             <stop offset='100%' stop-color='{theme["line_end"]}'/>
         </linearGradient>
-  </defs>
-    <rect width='450' height='200' rx='16' fill='url(#g)'/>
-        <rect x='8' y='8' width='434' height='184' rx='12' fill='{theme["panel"]}'/>
-    <rect x='16' y='16' width='72' height='72' rx='14' fill='rgba(255,255,255,0.20)' stroke='rgba(255,255,255,0.50)'/>
     <clipPath id='avatarClip'>
         <rect x='20' y='20' width='64' height='64' rx='12'/>
     </clipPath>
-    <image x='20' y='20' width='64' height='64' href='{avatar_data_uri}' preserveAspectRatio='xMidYMid slice' clip-path='url(#avatarClip)'/>
-    <text x='96' y='48' fill='#ffffff' font-size='28' font-family='Segoe UI, Malgun Gothic, sans-serif' font-weight='700'>{nickname}</text>
-    <rect x='230' y='22' width='76' height='24' rx='12' fill='rgba(255,255,255,0.22)' stroke='rgba(255,255,255,0.48)'/>
-    <text x='30' y='20' fill='#f8fff9' font-size='12' text-anchor='middle' font-family='Segoe UI, Malgun Gothic, sans-serif'>{escape(avatar_text)}</text>
-    <text x='96' y='84' fill='#eafff2' font-size='20' font-family='Segoe UI, Malgun Gothic, sans-serif'>{escape(subtitle1)}</text>
-    {gauge_svg}
-    <rect x='337' y='15' width='94' height='94' rx='12' fill='rgba(255,255,255,0.18)' stroke='rgba(255,255,255,0.45)'/>
-    <image x='340' y='17' width='90' height='90' href='{icon_data_uri}' preserveAspectRatio='xMidYMid meet'/>
-    <text x='268' y='38' fill='#fff4c5' font-size='16' text-anchor='middle' font-family='Segoe UI, Malgun Gothic, sans-serif'>{escape(star_text or '-')}</text>
-    <text x='24' y='110' fill='rgba(234,255,242,0.95)' font-size='15' font-family='Segoe UI, Malgun Gothic, sans-serif'>대국 기록</text>
-    <rect x='{chart_x}' y='{chart_y}' width='{chart_w}' height='{chart_h}' rx='8' fill='rgba(255,255,255,0.14)'/>
-    {rank_grid_lines}
-    {rank_labels}
+  </defs>
+    <rect width='450' height='200' rx='16' fill='url(#g)'/>
+        <rect x='8' y='8' width='434' height='184' rx='12' fill='{theme["panel"]}'/>
+    <!-- Profile Section -->
+    <g opacity='0'>
+      <animate attributeName='opacity' from='0' to='1' dur='0.5s' begin='0s' fill='freeze'/>
+      <rect x='16' y='16' width='72' height='72' rx='14' fill='rgba(255,255,255,0.20)' stroke='rgba(255,255,255,0.50)'/>
+      <image x='20' y='20' width='64' height='64' href='{avatar_data_uri}' preserveAspectRatio='xMidYMid slice' clip-path='url(#avatarClip)'/>
+      <text x='96' y='48' fill='#ffffff' font-size='28' font-family='Segoe UI, Malgun Gothic, sans-serif' font-weight='700'>{nickname}</text>
+      <rect x='230' y='22' width='76' height='24' rx='12' fill='rgba(255,255,255,0.22)' stroke='rgba(255,255,255,0.48)'/>
+      <text x='30' y='20' fill='#f8fff9' font-size='12' text-anchor='middle' font-family='Segoe UI, Malgun Gothic, sans-serif'>{escape(avatar_text)}</text>
+      <text x='96' y='84' fill='#eafff2' font-size='20' font-family='Segoe UI, Malgun Gothic, sans-serif'>{escape(subtitle1)}</text>
+    </g>
+    <!-- Rank Section -->
+    <g opacity='0'>
+      <animate attributeName='opacity' from='0' to='1' dur='0.5s' begin='0.5s' fill='freeze'/>
+      {gauge_svg}
+      <rect x='337' y='15' width='94' height='94' rx='12' fill='rgba(255,255,255,0.18)' stroke='rgba(255,255,255,0.45)'/>
+      <image x='340' y='17' width='90' height='90' href='{icon_data_uri}' preserveAspectRatio='xMidYMid meet'/>
+      <text x='268' y='38' fill='#fff4c5' font-size='16' text-anchor='middle' font-family='Segoe UI, Malgun Gothic, sans-serif'>{escape(star_text or '-')}</text>
+    </g>
+    <!-- Chart Section -->
+    <g opacity='0'>
+      <animate attributeName='opacity' from='0' to='1' dur='0.3s' begin='1s' fill='freeze'/>
+      <text x='24' y='110' fill='rgba(234,255,242,0.95)' font-size='15' font-family='Segoe UI, Malgun Gothic, sans-serif'>대국 기록</text>
+      <rect x='{chart_x}' y='{chart_y}' width='{chart_w}' height='{chart_h}' rx='8' fill='rgba(255,255,255,0.14)'/>
+      {rank_grid_lines}
+      {rank_labels}
+    </g>
+    <!-- Graph Line and Points -->
     <polyline points='{polyline}' fill='none' stroke='url(#lineg)' stroke-width='3' stroke-linecap='round' stroke-linejoin='round' stroke-dasharray='1000' stroke-dashoffset='1000'>
-      <animate attributeName='stroke-dashoffset' from='1000' to='0' dur='3.5s' begin='0.8s' fill='freeze'/>
+      <animate attributeName='stroke-dashoffset' from='1000' to='0' dur='3.5s' begin='1.3s' fill='freeze'/>
     </polyline>
     {point_dots}
 </svg>"""
