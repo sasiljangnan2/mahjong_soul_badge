@@ -493,11 +493,9 @@ def _build_badge_svg_mode(
     <rect x='{chart_x}' y='{chart_y}' width='{chart_w}' height='{chart_h}' rx='8' fill='rgba(255,255,255,0.14)'/>
     {rank_grid_lines}
     {rank_labels}
-    <g>
-      <polyline points='{polyline}' fill='none' stroke='url(#lineg)' stroke-width='3' stroke-linecap='round' stroke-linejoin='round' opacity='0'>
-        <animate attributeName='opacity' from='0' to='1' dur='0.8s' begin='0s' fill='freeze'/>
-      </polyline>
-    </g>
+    <polyline points='{polyline}' fill='none' stroke='url(#lineg)' stroke-width='3' stroke-linecap='round' stroke-linejoin='round' stroke-dasharray='1000' stroke-dashoffset='1000'>
+      <animate attributeName='stroke-dashoffset' from='1000' to='0' dur='0.8s' begin='0s' fill='freeze'/>
+    </polyline>
     {point_dots}
 </svg>"""
 
