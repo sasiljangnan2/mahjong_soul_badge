@@ -457,7 +457,7 @@ def _build_badge_svg_mode(
 
         polyline = " ".join(f"{x:.1f},{y:.1f}" for x, y in coords)
         for idx, (x, y) in enumerate(coords):
-            delay = 2.0 + (idx * 0.12)  # 각 점마다 지연
+            delay = 0.5 + (idx * 0.12)  # 각 점마다 지연
             point_dots += f"""<circle cx='{x:.1f}' cy='{y:.1f}' r='3.6' fill='#fff6b0' stroke='#ffffff' stroke-width='1.2'>
       <animate attributeName='opacity' values='0;1;1' keyTimes='0;0.5;1' dur='0.6s' begin='{delay}s' fill='freeze'/>
       <animate attributeName='r' values='1.2;5.5;3.6' keyTimes='0;0.5;1' dur='0.6s' begin='{delay}s' fill='freeze'/>
