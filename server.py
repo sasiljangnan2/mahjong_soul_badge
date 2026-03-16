@@ -457,7 +457,7 @@ def _build_badge_svg_mode(
 
         polyline = " ".join(f"{x:.1f},{y:.1f}" for x, y in coords)
         for idx, (x, y) in enumerate(coords):
-            delay = 0.8 + (idx * 0.12)  # 각 점마다 지연
+            delay = 2.0 + (idx * 0.12)  # 각 점마다 지연
             point_dots += f"""<circle cx='{x:.1f}' cy='{y:.1f}' r='3.6' fill='#fff6b0' stroke='#ffffff' stroke-width='1.2'>
       <animate attributeName='opacity' values='0;1;1' keyTimes='0;0.5;1' dur='0.6s' begin='{delay}s' fill='freeze'/>
       <animate attributeName='r' values='1.2;5.5;3.6' keyTimes='0;0.5;1' dur='0.6s' begin='{delay}s' fill='freeze'/>
@@ -494,7 +494,7 @@ def _build_badge_svg_mode(
     {rank_grid_lines}
     {rank_labels}
     <polyline points='{polyline}' fill='none' stroke='url(#lineg)' stroke-width='3' stroke-linecap='round' stroke-linejoin='round' stroke-dasharray='1000' stroke-dashoffset='1000'>
-      <animate attributeName='stroke-dashoffset' from='1000' to='0' dur='1.5s' begin='0s' fill='freeze'/>
+      <animate attributeName='stroke-dashoffset' from='1000' to='0' dur='1.5s' begin='0.5s' fill='freeze'/>
     </polyline>
     {point_dots}
 </svg>"""
@@ -505,7 +505,7 @@ def _build_badge_svg(profile: dict) -> str:
         profile=profile,
         rank_key="rank_4p",
         recent_key="four_player",
-        mode_label="4P",
+        mode_label="4인",
         max_rank=4,
         icon_data_uri = _rank_icon_data_uri(int((profile.get("rank_4p") or {}).get("tier") or 0))
     )
@@ -515,7 +515,7 @@ def _build_badge3_svg(profile: dict) -> str:
         profile=profile,
         rank_key="rank_3p",
         recent_key="three_player",
-        mode_label="3P",
+        mode_label="3인",
         max_rank=3,
         icon_data_uri = _3rank_icon_data_uri(int((profile.get("rank_3p") or {}).get("tier") or 0))
     )
