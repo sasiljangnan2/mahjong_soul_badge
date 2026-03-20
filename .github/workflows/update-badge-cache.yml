@@ -2,7 +2,7 @@ name: Update Badge Cache Buster
 
 on:
   schedule:
-    - cron: '15 * * * *'  # 매시간 15분에 실행 (서버 sync 후 여유를 두고)
+    - cron: '15 0 * * *'  # 매일 00:15에 실행 (하루에 한 번, 서버 sync 후 여유를 두고)
   workflow_dispatch:        # 수동 실행 가능
 
 jobs:

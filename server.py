@@ -75,7 +75,7 @@ _RANK_SCORE_RANGES: dict[tuple[int, int], tuple[int, int]] = {
     (5, 3): (4500, 9000),
 }
 
-SYNC_INTERVAL_SECONDS = int(os.environ.get("SYNC_INTERVAL", 3600))  # 기본 1시간
+SYNC_INTERVAL_SECONDS = int(os.environ.get("SYNC_INTERVAL", 86400))  # 기본 24시간
 
 
 async def _background_sync_all() -> None:
@@ -469,7 +469,7 @@ def _build_badge_svg_mode(
 
         polyline = " ".join(f"{x:.1f},{y:.1f}" for x, y in coords)
         for idx, (x, y) in enumerate(coords):
-            delay = 1.3 + (idx * 0.2)  # 각 점마다 지연
+            delay = 1.3 + (idx * 0.15)  # 각 점마다 지연
             point_dots += f"""<circle cx='{x:.1f}' cy='{y:.1f}' r='3.6' fill='#fff6b0' stroke='#ffffff' stroke-width='1.2' opacity='0'>
       <animate attributeName='opacity' values='0;1;1' keyTimes='0;0.5;1' dur='0.8s' begin='{delay}s' fill='freeze'/>
       <animate attributeName='r' values='1.2;5.5;3.6' keyTimes='0;0.5;1' dur='0.8s' begin='{delay}s' fill='freeze'/>
