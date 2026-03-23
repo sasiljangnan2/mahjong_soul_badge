@@ -1,4 +1,4 @@
-protobuf==4.22.3
+protobuf>=5.0
 websockets==15.0.1
 aiohttp==3.9.0
 fastapi==0.116.1
