@@ -154,10 +154,55 @@ async def resolve_account_id_by_nickname(lobby, nickname):
     return candidates[0]
 
 
+def _parse_highest_hu_record(hu):
+    """protobuf HighestHuRecord -> dict"""
+    if not hu:
+        return None
+    try:
+        # 데이터 유효성 검사: title이나 title_id 둘 중 하나라도 있으면 유효
+        if not (hu.title or hu.title_id):
+            return None
+        
+        # 안전한 데이터 추출
+        result = {
+            "fanshu": int(hu.fanshu) if hu.fanshu else 0,
+            "doranum": int(hu.doranum) if hu.doranum else 0,
+            "title": str(hu.title) if hu.title else "",
+            "title_id": int(hu.title_id) if hu.title_id else 0,
+            "hands": list(hu.hands) if hu.hands else [],
+            "ming": list(hu.ming) if hu.ming else [],
+            "hupai": str(hu.hupai) if hu.hupai else "",
+        }
+        
+        # 유효한 데이터 확인: title이 있으면 반환
+        if result.get("title"):
+            return result
+        # title이 없지만 title_id가 있으면 반환
+        elif result.get("title_id"):
+            return result
+        else:
+            return None
+    except Exception:
+        return None
+
+
 def build_account_summary(account_info_res):
     account = account_info_res.account
     achievement_total = sum(item.count for item in account.achievement_count)
     achievement_by_rare = {str(item.rare): item.count for item in account.achievement_count}
+
+    # 프로필에 설정된 하이라이트(즐겨찾기) 화료 정보 추출
+    favorites = []
+    if hasattr(account, 'favorite_hu'):
+        for fav in account.favorite_hu:
+            hu_data = _parse_highest_hu_record(fav.hu)
+            if hu_data:
+                favorites.append({
+                    "category": fav.category,  # 1: 4인, 2: 3인
+                    "mode": fav.mode,
+                    "type": fav.type,
+                    "hu": hu_data
+                })
 
     return {
         "account_id": account.account_id,
@@ -169,6 +214,7 @@ def build_account_summary(account_info_res):
         "rank_4p": _build_rank_info(account.level.id, account.level.score),
         "rank_3p": _build_rank_info(account.level3.id, account.level3.score),
         "achievement": {"total": achievement_total, "by_rare": achievement_by_rare},
+        "favorite_hu": favorites,
     }
 
 
@@ -198,6 +244,17 @@ def build_recent_from_statistics(stat_res, recent_count):
             )
         return items
 
+    def highest_hu_from_block(data):
+        """최고 패 정보 추출 (실제 API 데이터 우선, 없으면 None)"""
+        if not data or not data.statistic:
+            return None
+        
+        # highest_hu 필드 존재 여부 확인
+        if not hasattr(data.statistic, 'highest_hu') or not data.statistic.highest_hu:
+            return None
+        
+        return _parse_highest_hu_record(data.statistic.highest_hu)
+
     by_category = {}
 
     for stat_data in stat_res.statistic_data:
@@ -209,22 +266,45 @@ def build_recent_from_statistics(stat_res, recent_count):
     recent_4p = []
     recent_3p = []
     unknown = []
+    highest_hu_4p = None
+    highest_hu_3p = None
 
     for category, blocks in by_category.items():
+        # 등급전(game_category == 2) 데이터만 필터링
+        blocks = [b for b in blocks if getattr(b, 'game_category', 0) == 2]
+        if not blocks:
+            continue
+
+        # 가장 많이 플레이한 블록을 기준으로 highest_hu 추출
         primary = max(blocks, key=block_score)
-        primary_items = items_from_block(primary)[:recent_count]
+        
+        # 게임 기록은 모든 블록에서 수집
+        all_items = []
+        for block in blocks:
+            all_items.extend(items_from_block(block))
 
         if category == 1:
-            recent_4p = primary_items
+            recent_4p = all_items
+            highest_hu_4p = highest_hu_from_block(primary)
         elif category == 2:
-            recent_3p = primary_items
+            recent_3p = all_items
+            highest_hu_3p = highest_hu_from_block(primary)
         else:
-            unknown.extend(primary_items)
+            unknown.extend(all_items)
 
     return {
-        "four_player": recent_4p[:recent_count],
-        "three_player": recent_3p[:recent_count],
-        "unknown": unknown[:recent_count],
+        "four_player": {
+            "recent_games": recent_4p[:recent_count],
+            "highest_hu": highest_hu_4p,
+        },
+        "three_player": {
+            "recent_games": recent_3p[:recent_count],
+            "highest_hu": highest_hu_3p,
+        },
+        "unknown": {
+            "recent_games": unknown[:recent_count],
+            "highest_hu": None,
+        },
     }
 
 

@@ -189,11 +189,31 @@ def _save_summary(summary: dict, aliases: list[str] | None = None) -> dict:
     PLAYERS_DIR.mkdir(parents=True, exist_ok=True)
     account_id = summary["account"]["account_id"]
     nickname = summary["account"].get("nickname")
+    
+    # 데이터 형식 정규화: recent_games를 새로운 형식으로 통일
+    recent_games_raw = summary.get("recent_games", {})
+    recent_games_normalized = {}
+    for key in ["four_player", "three_player", "unknown"]:
+        if key not in recent_games_raw:
+            recent_games_normalized[key] = {"recent_games": [], "highest_hu": None}
+        elif isinstance(recent_games_raw[key], list):
+            # 이전 형식: 직접 list → 새 형식으로 변환
+            recent_games_normalized[key] = {
+                "recent_games": recent_games_raw[key],
+                "highest_hu": None,
+            }
+        else:
+            # 새로운 형식: 그대로 사용
+            recent_games_normalized[key] = recent_games_raw[key]
+    
+    # 정규화된 데이터로 summary 업데이트
+    summary_normalized = {**summary, "recent_games": recent_games_normalized}
+    
     payload = {
         "account_id": account_id,
         "nickname": nickname,
         "updated_at": datetime.now(timezone.utc).isoformat(),
-        "summary": summary,
+        "summary": summary_normalized,
     }
     _player_file(account_id).write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
 
@@ -241,8 +261,26 @@ async def _load_or_auto_sync(nickname: str, force: bool = True) -> dict:
 
 
 def _build_public_profile(payload: dict) -> dict:
+    """저장된 데이터를 프로필 형식으로 변환 (이전/새로운 형식 모두 지원)"""
     summary = payload.get("summary", {})
     account = summary.get("account", {})
+    recent_games_raw = summary.get("recent_games", {})
+    
+    # 데이터 형식 정규화: 이전 형식(직접 list)을 새 형식(dict with recent_games/highest_hu)으로 변환
+    recent_games_normalized = {}
+    for key in ["four_player", "three_player", "unknown"]:
+        if key not in recent_games_raw:
+            recent_games_normalized[key] = {"recent_games": [], "highest_hu": None}
+        elif isinstance(recent_games_raw[key], list):
+            # 이전 형식: 직접 list → 새 형식으로 변환
+            recent_games_normalized[key] = {
+                "recent_games": recent_games_raw[key],
+                "highest_hu": None,
+            }
+        else:
+            # 새로운 형식: 그대로 사용
+            recent_games_normalized[key] = recent_games_raw[key]
+    
     return {
         "nickname": account.get("nickname") or payload.get("nickname"),
         "account_id": account.get("account_id"),
@@ -251,7 +289,9 @@ def _build_public_profile(payload: dict) -> dict:
         "rank_4p": account.get("rank_4p", {}),
         "rank_3p": account.get("rank_3p", {}),
         "achievement_total": (account.get("achievement") or {}).get("total"),
-        "recent_games": summary.get("recent_games", {}),
+        "recent_games": recent_games_normalized,
+        # 즐겨찾기(하이라이트) 정보 추가
+        "favorite_hu": account.get("favorite_hu", []),
     }
 
 
@@ -279,7 +319,7 @@ def _3rank_icon_data_uri(tier: int) -> str:
 
 @lru_cache(maxsize=256)
 def _avatar_icon_data_uri(avatar_id: int) -> str:
-    avatar_base = str(int(avatar_id))[:4] if avatar_id else "0"
+    avatar_base = str(int(avatar_id)) if avatar_id else "0"
     candidates = [
         AVATAR_ASSETS_DIR / f"{avatar_base}.svg",
         AVATAR_ASSETS_DIR / f"{avatar_base}.png",
@@ -303,11 +343,12 @@ def _build_badge_svg_mode(
     mode_label: str,
     max_rank: int,
     icon_data_uri: str,
+    mahjong_category: int  # 1 for 4-player, 2 for 3-player
 ) -> str:
     nickname = escape(str(profile.get("nickname") or "Unknown"))
     avatar = profile.get("avatar") or {}
     avatar_id = int(avatar.get("avatar_id") or 0)
-    avatar_base = str(avatar_id)[:4] if avatar_id else "-"
+    avatar_base = str(avatar_id) if avatar_id else "-"
     avatar_text = f"A#{avatar_base}" if avatar_id else "A#-"
     avatar_data_uri = _avatar_icon_data_uri(avatar_id)
     rank_data = profile.get(rank_key) or {}
@@ -420,7 +461,29 @@ def _build_badge_svg_mode(
             f"font-family='Segoe UI, Malgun Gothic, sans-serif'>{score_int}/{cap_score} </text>"
         )
 
-    recent_games = ((profile.get("recent_games") or {}).get(recent_key) or [])[:10]
+    category_data = (profile.get("recent_games") or {}).get(recent_key) or {}
+    
+    # 하위 호환성: 기존 형식(list)과 새로운 형식(dict) 모두 지원
+    if isinstance(category_data, list):
+        # 이전 형식: 직접 list
+        recent_games = category_data[:10]
+        highest_hu = None
+    else:
+        # 새로운 형식: dict with recent_games and highest_hu
+        raw_games = category_data.get("recent_games") or []
+        # 등급전(game_category=2) 데이터만 필터링하여 그래프에 표시
+        # game_category 필드가 없는 경우(구 데이터)는 등급전으로 간주(2)
+        recent_games = [g for g in raw_games if g.get("game_category", 2) == 2][:10]
+        highest_hu = category_data.get("highest_hu")
+    
+    # 즐겨찾기(Favorite Hu) 확인: 해당 모드(mahjong_category)에 맞는 첫 번째 즐겨찾기가 있으면 highest_hu 대체
+    favorite_hu_list = profile.get("favorite_hu", [])
+    for fav in favorite_hu_list:
+        # fav.category 1=4p, 2=3p
+        if fav.get("category") == mahjong_category:
+            highest_hu = fav.get("hu")
+            break
+    
     # recent list is latest-first in current payload; reverse so latest appears on the right side.
     recent_games = list(reversed(recent_games))
     ranks = []
@@ -430,10 +493,11 @@ def _build_badge_svg_mode(
         value = int(item.get("rank", max_rank))
         ranks.append(max(1, min(max_rank, value)))
 
+    # Chart 관련 변수 (y 좌표를 아래로 조정하여 공간 확보)
     chart_x = 40
-    chart_y = 120
+    chart_y = 135
     chart_w = 390
-    chart_h = 58
+    chart_h = 50
 
     polyline = ""
     rank_grid_lines = ""
@@ -475,6 +539,190 @@ def _build_badge_svg_mode(
       <animate attributeName='r' values='1.2;5.5;3.6' keyTimes='0;0.5;1' dur='0.8s' begin='{delay}s' fill='freeze'/>
     </circle>"""
 
+    # 마작 타일을 SVG로 그리는 함수
+    def tile_int_to_code(tile_int):
+        """정수 타일값을 "5m" 형식의 코드로 변환 (적도는 "5m_red")
+        
+        Majsoul 타일 인코딩:
+        0-8:   1m-9m
+        9-17:  1p-9p
+        18-26: 1s-9s
+        27-33: 1z-7z
+        0x10 비트: 적패(빨간 5) 플래그
+        """
+        # 정수가 아닌 경우 (이미 문자열이면 그대로 반환)
+        if isinstance(tile_int, str):
+            # 적도패(0m, 0p, 0s) 처리
+            if tile_int == "0m": return "5m_red"
+            if tile_int == "0p": return "5p_red"
+            if tile_int == "0s": return "5s_red"
+            return tile_int
+        
+        tile_int = int(tile_int)
+        
+        # 적패(빨간 5) 플래그 확인 (0x10 비트)
+        is_red = (tile_int & 0x10) != 0
+        tile_int = tile_int & 0x0F  # 플래그 제거
+        
+        # 기본 타일 코드 계산
+        if 0 <= tile_int <= 8:
+            num = tile_int + 1
+            suit = 'm'
+        elif 9 <= tile_int <= 17:
+            num = tile_int - 9 + 1
+            suit = 'p'
+        elif 18 <= tile_int <= 26:
+            num = tile_int - 18 + 1
+            suit = 's'
+        elif 27 <= tile_int <= 33:
+            num = tile_int - 27 + 1
+            suit = 'z'
+        else:
+            return ""
+        
+        # 5m, 5p, 5s는 적도 여부에 따라 구분
+        tile_code = f"{num}{suit}"
+        if is_red and num == 5 and suit in ['m', 'p', 's']:
+            tile_code = f"{num}{suit}_red"
+        
+        return tile_code
+    
+    def render_tile_svg(tile_code, x: int, y: int, w: int = 20, h: int = 28) -> str:
+        """마작 타일 이미지를 SVG에 삽입
+        tile_code: "4m", "6p", "5s", "1z" 형태 또는 정수
+        """
+        # 정수면 코드로 변환
+        tile_code = tile_int_to_code(tile_code)
+        
+        if not tile_code or len(tile_code) < 2:
+            return ""
+        
+        import base64
+        import os
+        
+        # 타일 이미지 파일 경로
+        tile_image_path = os.path.join(os.path.dirname(__file__), 'assets', 'tiles', f'{tile_code}.png')
+        
+        # 파일이 존재하면 base64로 인코딩
+        if os.path.exists(tile_image_path):
+            try:
+                with open(tile_image_path, 'rb') as f:
+                    image_data = base64.b64encode(f.read()).decode('utf-8')
+                # 타일 이미지 SVG에 삽입
+                return f'<image href="data:image/png;base64,{image_data}" x="{x}" y="{y}" width="{w}" height="{h}"/>'
+            except Exception as e:
+                print(f"타일 이미지 로드 실패 {tile_code}: {e}")
+        
+        # 폴백: 이미지 없으면 텍스트로 표시
+        num = tile_code[:-1]
+        suit = tile_code[-1]
+        colors = {
+            'm': '#E53935',    # 맨즈: 빨강
+            'p': '#FDD835',    # 핀즈: 노랑
+            's': '#43A047',    # 소즈: 초록
+            'z': '#424242',    # 자패: 검정
+        }
+        color = colors.get(suit, '#666')
+        text_color = 'white' if suit in ['m', 'z'] else 'black'
+        font_sz = int(h * 0.4)
+        
+        return f'''<g>
+<rect x="{x}" y="{y}" width="{w}" height="{h}" rx="2" fill="{color}" stroke="rgba(255,255,255,0.3)" stroke-width="0.5"/>
+<text x="{x+w/2}" y="{y+h*0.75}" text-anchor="middle" font-size="{font_sz}" font-weight="bold" fill="{text_color}" font-family="Arial, sans-serif">{num}</text>
+</g>'''
+    
+    # 최고 패 정보 포매팅 (위치를 차트 바로 위로)
+    highest_hu_svg = ""
+    if highest_hu:
+        hands = highest_hu.get("hands", [])
+        ming = highest_hu.get("ming", [])
+        hupai = highest_hu.get("hupai", "")
+        
+        if hands:
+            # 타일 SVG 생성
+            tiles_svg = ""
+            
+            # "최고 화료" 라벨은 생략하거나 작게 표시 (공간 문제)
+            # tiles_svg += ...
+            
+            x_pos = 16
+            # 차트가 135부터 시작하므로, 그 바로 위인 100~130 영역 사용
+            # 타일 높이 28px
+            base_y = 95
+            
+            # (1) 배치 계산: 타일 개수 확인 및 스케일 조정
+            parsed_ming = []
+            if ming:
+                for m in ming:
+                    if '(' in m and m.endswith(')'):
+                        content = m[m.find('(')+1:-1]
+                        parts = [t.strip() for t in content.split(',') if t.strip()]
+                        parsed_ming.extend(parts)
+                    else:
+                        parsed_ming.append(m)
+
+            count_hands = len(hands)
+            count_ming = len(parsed_ming)
+            count_hupai = 1 if hupai else 0
+            
+            # 기본값
+            default_w = 20
+            default_h = 28
+            default_spacing = 22
+            ref_group_gap = 10
+            
+            # 정확한 너비 계산
+            req_width = (count_hands * default_spacing)
+            if count_ming > 0:
+                req_width += int(ref_group_gap * 0.5) + (count_ming * default_spacing)
+            if count_hupai > 0:
+                req_width += int(ref_group_gap * 0.8) + (count_hupai * default_spacing)
+            
+            # 마지막 타일의 여백(spacing - w)을 제외하면 조금 더 공간 확보 가능하지만
+            # 계산 단순화를 위해 포함하되 여유 공간을 둠
+            
+            # 사용 가능 너비: 전체 너비 450 중 좌우 여백(약 16~20px씩) 제외
+            avail_width = 414
+            
+            scale = 1.0
+            if req_width > avail_width:
+                scale = avail_width / req_width
+                scale *= 0.98  # 약간의 여유
+            
+            # 스케일 적용 (너무 작아지지 않도록 하한선은 두되, 18개 이상일 경우 더 줄어들 수 있게 0.5로 완화)
+            scale = max(scale, 0.5)
+            
+            tile_w = int(default_w * scale)
+            tile_h = int(default_h * scale)
+            spacing = int(default_spacing * scale)
+            
+            # 그룹 간격도 스케일링
+            ming_gap_px = int(ref_group_gap * 0.5 * scale)
+            hu_gap_px = int(ref_group_gap * 0.8 * scale)
+            
+            # 위치 미세 조정 (작아진 만큼 라인 중앙 정렬)
+            base_y = 95 + (28 - tile_h) // 2 
+            
+            # (2) 렌더링
+            # 손패 타일들
+            for tile in hands:
+                tiles_svg += render_tile_svg(tile, x_pos, base_y, tile_w, tile_h)
+                x_pos += spacing
+            
+            # 운 패 (밍패) - | 대신 공백 사용
+            if parsed_ming:
+                x_pos += ming_gap_px
+                for tile in parsed_ming:
+                    tiles_svg += render_tile_svg(tile, x_pos, base_y, tile_w, tile_h)
+                    x_pos += spacing
+            
+            # 쯔모/론 패 - + 대신 공백 사용
+            if hupai:
+                x_pos += hu_gap_px
+                tiles_svg += render_tile_svg(hupai, x_pos, base_y, tile_w, tile_h)
+            
+            highest_hu_svg = tiles_svg
+    
     return f"""<svg xmlns='http://www.w3.org/2000/svg' width='450' height='200' role='img' aria-label='Majsoul profile badge'>
   <defs>
     <linearGradient id='g' x1='0' y1='0' x2='1' y2='1'>
@@ -497,7 +745,7 @@ def _build_badge_svg_mode(
       <rect x='16' y='16' width='72' height='72' rx='14' fill='rgba(255,255,255,0.20)' stroke='rgba(255,255,255,0.50)'/>
       <image x='20' y='20' width='64' height='64' href='{avatar_data_uri}' preserveAspectRatio='xMidYMid slice' clip-path='url(#avatarClip)'/>
       <text x='96' y='48' fill='#ffffff' font-size='28' font-family='Segoe UI, Malgun Gothic, sans-serif' font-weight='700'>{nickname}</text>
-      <text x='30' y='20' fill='#f8fff9' font-size='12' text-anchor='middle' font-family='Segoe UI, Malgun Gothic, sans-serif'>{escape(avatar_text)}</text>
+      <text x='16' y='20' fill='#f8fff9' font-size='8' text-anchor='start' font-family='Segoe UI, Malgun Gothic, sans-serif'>{escape(avatar_text)}</text>
       <text x='96' y='84' fill='#eafff2' font-size='20' font-family='Segoe UI, Malgun Gothic, sans-serif'>{escape(subtitle1)}</text>
     </g>
     <!-- Rank Section - Background & Gauge -->
@@ -517,7 +765,7 @@ def _build_badge_svg_mode(
     <!-- Chart Section -->
     <g opacity='0'>
       <animate attributeName='opacity' from='0' to='1' dur='0.3s' begin='1s' fill='freeze'/>
-      <text x='24' y='110' fill='rgba(234,255,242,0.95)' font-size='15' font-family='Segoe UI, Malgun Gothic, sans-serif'>대국 기록</text>
+      {highest_hu_svg}
       <rect x='{chart_x}' y='{chart_y}' width='{chart_w}' height='{chart_h}' rx='8' fill='rgba(255,255,255,0.14)'/>
       {rank_grid_lines}
       {rank_labels}
@@ -537,7 +785,8 @@ def _build_badge_svg(profile: dict) -> str:
         recent_key="four_player",
         mode_label="4인",
         max_rank=4,
-        icon_data_uri = _rank_icon_data_uri(int((profile.get("rank_4p") or {}).get("tier") or 0))
+        icon_data_uri = _rank_icon_data_uri(int((profile.get("rank_4p") or {}).get("tier") or 0)),
+        mahjong_category=1
     )
     
 def _build_badge3_svg(profile: dict) -> str:
@@ -547,7 +796,8 @@ def _build_badge3_svg(profile: dict) -> str:
         recent_key="three_player",
         mode_label="3인",
         max_rank=3,
-        icon_data_uri = _3rank_icon_data_uri(int((profile.get("rank_3p") or {}).get("tier") or 0))
+        icon_data_uri = _3rank_icon_data_uri(int((profile.get("rank_3p") or {}).get("tier") or 0)),
+        mahjong_category=2
     )
 
 
@@ -625,11 +875,27 @@ async def debug_player_data(nickname: str):
         raise HTTPException(status_code=404, detail="Data file not found")
     raw = json.loads(file_path.read_text(encoding="utf-8"))
     recent = raw.get("summary", {}).get("recent_games", {})
+    
+    def extract_data(category_data):
+        """이전 형식(list)과 새로운 형식(dict) 모두 지원"""
+        if isinstance(category_data, list):
+            # 이전 형식: 직접 list
+            return {
+                "count": len(category_data),
+                "highest_hu": None,
+                "sample": category_data[:3],
+            }
+        else:
+            # 새로운 형식: dict with recent_games and highest_hu
+            return {
+                "count": len(category_data.get("recent_games") or []),
+                "highest_hu": category_data.get("highest_hu"),
+                "sample": (category_data.get("recent_games") or [])[:3],
+            }
+    
     return JSONResponse({
         "updated_at": raw.get("updated_at"),
         "nickname": raw.get("nickname"),
-        "four_player_count": len(recent.get("four_player") or []),
-        "three_player_count": len(recent.get("three_player") or []),
-        "four_player_sample": (recent.get("four_player") or [])[:3],
-        "three_player_sample": (recent.get("three_player") or [])[:3],
+        "four_player": extract_data(recent.get("four_player") or []),
+        "three_player": extract_data(recent.get("three_player") or []),
     })
