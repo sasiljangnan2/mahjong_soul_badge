@@ -191,10 +191,13 @@ def build_account_summary(account_info_res):
     achievement_total = sum(item.count for item in account.achievement_count)
     achievement_by_rare = {str(item.rare): item.count for item in account.achievement_count}
 
-    # 프로필에 설정된 하이라이트(즐겨찾기) 화료 정보 추출
+    # 프로필에 설정된 하이라이트(즐겨찾기) 화료 정보 추출 - 등급전(type=2)만 가져오기
     favorites = []
     if hasattr(account, 'favorite_hu'):
         for fav in account.favorite_hu:
+            # 등급전(type=2)으로 설정된 하이라이트만 포함
+            if fav.type != 2:
+                continue
             hu_data = _parse_highest_hu_record(fav.hu)
             if hu_data:
                 favorites.append({
