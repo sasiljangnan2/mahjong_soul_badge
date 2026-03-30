@@ -191,12 +191,12 @@ def build_account_summary(account_info_res):
     achievement_total = sum(item.count for item in account.achievement_count)
     achievement_by_rare = {str(item.rare): item.count for item in account.achievement_count}
 
-    # 프로필에 설정된 하이라이트(즐겨찾기) 화료 정보 추출 - 등급전(type=2)만 가져오기
+    # 프로필에 설정된 하이라이트(즐겨찾기) 화료 정보 추출 - 등급전(type=1)만 가져오기
     favorites = []
     if hasattr(account, 'favorite_hu'):
         for fav in account.favorite_hu:
-            # 등급전(type=2)으로 설정된 하이라이트만 포함
-            if fav.type != 2:
+            # 등급전(type=1)으로 설정된 하이라이트만 포함
+            if fav.type != 1:
                 continue
             hu_data = _parse_highest_hu_record(fav.hu)
             if hu_data:
@@ -273,7 +273,7 @@ def build_recent_from_statistics(stat_res, recent_count):
     highest_hu_3p = None
 
     for category, blocks in by_category.items():
-        # 등급전(game_category == 2) 데이터만 필터링
+        # 등급전(game_category == 2)만 처리, 친선전은 제외
         blocks = [b for b in blocks if getattr(b, 'game_category', 0) == 2]
         if not blocks:
             continue
@@ -281,19 +281,18 @@ def build_recent_from_statistics(stat_res, recent_count):
         # 가장 많이 플레이한 블록을 기준으로 highest_hu 추출
         primary = max(blocks, key=block_score)
         
-        # 게임 기록은 모든 블록에서 수집
+        # 등급전 게임 기록만 수집
         all_items = []
         for block in blocks:
             all_items.extend(items_from_block(block))
 
+        # 4인/3인 카테고리로만 저장 (친선전 데이터는 제외)
         if category == 1:
             recent_4p = all_items
             highest_hu_4p = highest_hu_from_block(primary)
         elif category == 2:
             recent_3p = all_items
             highest_hu_3p = highest_hu_from_block(primary)
-        else:
-            unknown.extend(all_items)
 
     return {
         "four_player": {

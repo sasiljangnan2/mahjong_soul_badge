@@ -136,7 +136,7 @@ def create_tile(num, suit, is_red=False):
         # 5. 그리기 (anchor='mt' 사용: 상단 기준 위치 잡기)
         # 숫자 (위)
         # textbbox의 y오프셋 보정
-        draw.text((large_width // 2, start_y), kan_text, 
+        draw.text((large_width // 2, start_y ), kan_text, 
                  fill=c_black, font=kan_font, anchor='mt',
                  stroke_width=stroke_w, stroke_fill=c_black)
         
@@ -499,7 +499,7 @@ def create_tile(num, suit, is_red=False):
             stroke_w = int(0.8 * 5)
             
             # Y 좌표 보정 없이 정중앙에 배치
-            draw.text((large_width // 2, large_height // 2), text, 
+            draw.text((large_width // 2, large_height // 2 - 12), text, 
                     fill=text_color, font=font, anchor='mm',
                     stroke_width=stroke_w, stroke_fill=text_color)
     

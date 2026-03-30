@@ -209,6 +209,15 @@ def _save_summary(summary: dict, aliases: list[str] | None = None) -> dict:
     # 정규화된 데이터로 summary 업데이트
     summary_normalized = {**summary, "recent_games": recent_games_normalized}
     
+    # favorite_hu 필터링: 등급전(type=1)만 저장
+    account_normalized = summary_normalized.get("account", {})
+    if account_normalized.get("favorite_hu"):
+        account_normalized["favorite_hu"] = [
+            fav for fav in account_normalized["favorite_hu"]
+            if fav.get("type") == 1
+        ]
+    summary_normalized["account"] = account_normalized
+    
     payload = {
         "account_id": account_id,
         "nickname": nickname,
@@ -290,8 +299,11 @@ def _build_public_profile(payload: dict) -> dict:
         "rank_3p": account.get("rank_3p", {}),
         "achievement_total": (account.get("achievement") or {}).get("total"),
         "recent_games": recent_games_normalized,
-        # 즐겨찾기(하이라이트) 정보 추가
-        "favorite_hu": account.get("favorite_hu", []),
+        # 즐겨찾기(하이라이트) 정보 추가 - 등급전(type=1)만 필터링
+        "favorite_hu": [
+            fav for fav in account.get("favorite_hu", [])
+            if fav.get("type") == 1
+        ],
     }
 
 
@@ -335,6 +347,13 @@ def _avatar_icon_data_uri(avatar_id: int) -> str:
     encoded = base64.b64encode(raw).decode("ascii")
     return f"data:{mime_type};base64,{encoded}"
 
+
+# 배지 렌더링 상수
+MAX_BADGE_WIDTH = 450
+MAX_BADGE_HEIGHT = 200
+TILE_RENDER_X_START = 16  # 아바타 사각형 왼쪽 (x=16)
+TILE_RENDER_X_END = 384   # 등급 그림 중간 (x=337 + 94/2 = 384)
+TILE_RENDER_MAX_WIDTH = TILE_RENDER_X_END - TILE_RENDER_X_START  # 368px
 
 def _build_badge_svg_mode(
     profile: dict,
@@ -476,12 +495,12 @@ def _build_badge_svg_mode(
         recent_games = [g for g in raw_games if g.get("game_category", 2) == 2][:10]
         highest_hu = category_data.get("highest_hu")
     
-    # 즐겨찾기(Favorite Hu) 확인: 등급전(type=2)에서 해당 모드(mahjong_category)에 맞는 첫 번째 즐겨찾기가 있으면 highest_hu 대체
+    # 즐겨찾기(Favorite Hu) 확인: 등급전(type=1)에서 해당 모드(mahjong_category)에 맞는 첫 번째 즐겨찾기가 있으면 highest_hu 대체
     favorite_hu_list = profile.get("favorite_hu", [])
     for fav in favorite_hu_list:
-        # fav.category 1=4p, 2=3p / fav.type 2=등급전
+        # fav.category 1=4p, 2=3p / fav.type 1=등급전
         # 등급전에서 설정된 하이라이트만 사용
-        if fav.get("category") == mahjong_category and fav.get("type") == 2:
+        if fav.get("category") == mahjong_category and fav.get("type") == 1:
             highest_hu = fav.get("hu")
             break
     
@@ -646,85 +665,123 @@ def _build_badge_svg_mode(
             # "최고 화료" 라벨은 생략하거나 작게 표시 (공간 문제)
             # tiles_svg += ...
             
-            x_pos = 16
+            x_pos = TILE_RENDER_X_START
             # 차트가 135부터 시작하므로, 그 바로 위인 100~130 영역 사용
             # 타일 높이 28px
             base_y = 95
             
             # (1) 배치 계산: 타일 개수 확인 및 스케일 조정
-            parsed_ming = []
+            # 칸(kezi)은 1개 그룹으로 세기 (시각적 개수 정확성)
+            ming_display_tiles = []  # 실제 렌더링할 타일들
+            count_ming = 0  # 밍패 그룹 개수 (칸=1, 폰=1, 등)
+            
             if ming:
                 for m in ming:
                     if '(' in m and m.endswith(')'):
+                        # 칸 형식: kezi(2z,2z,2z,2z) 또는 minggang(2z,2z,2z,2z)
                         content = m[m.find('(')+1:-1]
                         parts = [t.strip() for t in content.split(',') if t.strip()]
-                        parsed_ming.extend(parts)
+                        count_ming += 1  # 칸을 1개 그룹으로만 센다
+                        ming_display_tiles.extend(parts)  # 하지만 표시할 때는 모든 타일 렌더링
                     else:
-                        parsed_ming.append(m)
+                        count_ming += 1  # 일반 밍패도 1개로 센다
+                        ming_display_tiles.append(m)
 
-            count_hands = len(hands)
-            count_ming = len(parsed_ming)
-            count_hupai = 1 if hupai else 0
-            
-            # 기본값
-            default_w = 20
-            default_h = 28
-            default_spacing = 22
-            ref_group_gap = 10
-            
-            # 정확한 너비 계산
-            req_width = (count_hands * default_spacing)
-            if count_ming > 0:
-                req_width += int(ref_group_gap * 0.5) + (count_ming * default_spacing)
-            if count_hupai > 0:
-                req_width += int(ref_group_gap * 0.8) + (count_hupai * default_spacing)
-            
-            # 마지막 타일의 여백(spacing - w)을 제외하면 조금 더 공간 확보 가능하지만
-            # 계산 단순화를 위해 포함하되 여유 공간을 둠
-            
-            # 사용 가능 너비: 전체 너비 450 중 좌우 여백(약 16~20px씩) 제외
-            avail_width = 414
-            
-            scale = 1.0
-            if req_width > avail_width:
-                scale = avail_width / req_width
-                scale *= 0.98  # 약간의 여유
-            
-            # 스케일 적용 (너무 작아지지 않도록 하한선은 두되, 18개 이상일 경우 더 줄어들 수 있게 0.5로 완화)
-            scale = max(scale, 0.5)
-            
-            tile_w = int(default_w * scale)
-            tile_h = int(default_h * scale)
-            spacing = int(default_spacing * scale)
-            
-            # 그룹 간격도 스케일링
-            ming_gap_px = int(ref_group_gap * 0.5 * scale)
-            hu_gap_px = int(ref_group_gap * 0.8 * scale)
-            
-            # 위치 미세 조정 (작아진 만큼 라인 중앙 정렬)
-            base_y = 95 + (28 - tile_h) // 2 
-            
-            # (2) 렌더링
-            # 손패 타일들
-            for tile in hands:
-                tiles_svg += render_tile_svg(tile, x_pos, base_y, tile_w, tile_h)
-                x_pos += spacing
-            
-            # 운 패 (밍패) - | 대신 공백 사용
-            if parsed_ming:
-                x_pos += ming_gap_px
-                for tile in parsed_ming:
-                    tiles_svg += render_tile_svg(tile, x_pos, base_y, tile_w, tile_h)
-                    x_pos += spacing
-            
-            # 쯔모/론 패 - + 대신 공백 사용
-            if hupai:
-                x_pos += hu_gap_px
-                tiles_svg += render_tile_svg(hupai, x_pos, base_y, tile_w, tile_h)
-            
-            highest_hu_svg = tiles_svg
+            # 타일 렌더링 영역
+            if hands:
+                # 기본값
+                default_w = 20
+                default_h = 28
+                default_spacing = 2
+                ming_spacing_px = 2
+                ref_group_gap = 3
+                
+                # 전체 타일 개수 계산 (손패 + 운패 + 당첨패)
+                hands_count = len(hands)
+                ming_count = len(ming_display_tiles)
+                hupai_count = 1 if hupai else 0
+                
+                # 전체 필요 너비 계산 (모든 타일 + 간격)
+                total_required_width = (
+                    hands_count * default_w + max(0, hands_count - 1) * default_spacing +
+                    (ref_group_gap if ming_count > 0 else 0) +
+                    ming_count * default_w + max(0, ming_count - 1) * ming_spacing_px +
+                    (ref_group_gap if hupai_count > 0 else 0) +
+                    hupai_count * default_w
+                )
+                
+                # 전체 타일 개수
+                total_tiles = hands_count + ming_count + hupai_count
+                
+                # 14장 기준 너비 (306px)
+                base_14_width = 306  # 14장의 표준 길이
+                
+                # 축소율 계산
+                avail_width = TILE_RENDER_MAX_WIDTH  # 368px
+                
+                # 타일 개수에 따른 목표 너비
+                if total_tiles == 15:
+                    target_width = 315 # 15장: 306px
+                elif total_tiles > 14:
+                    target_width = 330  # 16장 이상: 330px (추후 조정 가능)
+                else:
+                    target_width = avail_width  # 14장 이하: 368px
+                
+                if total_required_width > target_width:
+                    scale = target_width / total_required_width
+                else:
+                    scale = 1.0
+                
+                scale = max(0.5, min(scale, 1.0))
+                
+                print(f"[DEBUG] 손패={hands_count}, 운패={ming_count}, 당첨패={hupai_count}, 총={total_tiles}")
+                print(f"[DEBUG] 필요너비={total_required_width}px, 목표너비={target_width}px, scale={scale}")
+                
+                # 모든 타일에 동일한 축소율 적용
+                tile_w = int(default_w * scale)
+                tile_h = int(default_h * scale)
+                spacing = int(default_spacing * scale)
+                ming_tile_w = int(default_w * scale)
+                ming_tile_h = int(default_h * scale)
+                ming_tile_spacing = int(ming_spacing_px * scale)
+                gap = int(ref_group_gap * scale)
+                
+                base_y = 95 + (28 - tile_h) // 2
+                
+                # 손패 렌더링
+                x_pos = TILE_RENDER_X_START
+                for idx, tile in enumerate(hands):
+                    if x_pos + tile_w <= TILE_RENDER_X_END:
+                        tiles_svg += render_tile_svg(tile, x_pos, base_y, tile_w, tile_h)
+                        x_pos += tile_w + spacing
+                
+                print(f"[DEBUG] 손패 렌더링 후 x_pos={x_pos}, tile_w={tile_w}, spacing={spacing}")
+                
+                # 운패 렌더링
+                if ming_display_tiles:
+                    x_pos += gap
+                    print(f"[DEBUG] 운패 시작 x_pos={x_pos}, gap={gap}, ming_tile_w={ming_tile_w}, 경계={TILE_RENDER_X_END}")
+                    for idx, tile in enumerate(ming_display_tiles):
+                        if x_pos + ming_tile_w <= TILE_RENDER_X_END:
+                            print(f"[DEBUG] 운패 {idx} 렌더링: x_pos={x_pos}, tile={tile}")
+                            tiles_svg += render_tile_svg(tile, x_pos, base_y, ming_tile_w, ming_tile_h)
+                            x_pos += ming_tile_w + ming_tile_spacing
+                        else:
+                            print(f"[DEBUG] 운패 {idx} 넘침: x_pos={x_pos} + {ming_tile_w} > {TILE_RENDER_X_END}")
+                
+                # 당첨패 렌더링
+                if hupai:
+                    x_pos += gap
+                    print(f"[DEBUG] 당첨패 x_pos={x_pos}, 경계={TILE_RENDER_X_END}")
+                    if x_pos + ming_tile_w <= TILE_RENDER_X_END:
+                        print(f"[DEBUG] 당첨패 렌더링: x_pos={x_pos}, hupai={hupai}")
+                        tiles_svg += render_tile_svg(hupai, x_pos, base_y, ming_tile_w, ming_tile_h)
+                    else:
+                        print(f"[DEBUG] 당첨패 넘침: x_pos={x_pos} + {ming_tile_w} > {TILE_RENDER_X_END}")
+                
+                highest_hu_svg = tiles_svg
     
-    return f"""<svg xmlns='http://www.w3.org/2000/svg' width='450' height='200' role='img' aria-label='Majsoul profile badge'>
+    return f"""<svg xmlns='http://www.w3.org/2000/svg' width='{MAX_BADGE_WIDTH}' height='{MAX_BADGE_HEIGHT}' role='img' aria-label='Majsoul profile badge'>
   <defs>
     <linearGradient id='g' x1='0' y1='0' x2='1' y2='1'>
             <stop offset='0%' stop-color='{theme["bg_start"]}'/>
@@ -738,8 +795,8 @@ def _build_badge_svg_mode(
         <rect x='20' y='20' width='64' height='64' rx='12'/>
     </clipPath>
   </defs>
-    <rect width='450' height='200' rx='16' fill='url(#g)'/>
-        <rect x='8' y='8' width='434' height='184' rx='12' fill='{theme["panel"]}'/>
+    <rect width='{MAX_BADGE_WIDTH}' height='{MAX_BADGE_HEIGHT}' rx='16' fill='url(#g)'/>
+        <rect x='8' y='8' width='{MAX_BADGE_WIDTH - 16}' height='{MAX_BADGE_HEIGHT - 16}' rx='12' fill='{theme["panel"]}'/>
     <!-- Profile Section -->
     <g opacity='0'>
       <animate attributeName='opacity' from='0' to='1' dur='0.5s' begin='0s' fill='freeze'/>
