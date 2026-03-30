@@ -476,11 +476,12 @@ def _build_badge_svg_mode(
         recent_games = [g for g in raw_games if g.get("game_category", 2) == 2][:10]
         highest_hu = category_data.get("highest_hu")
     
-    # 즐겨찾기(Favorite Hu) 확인: 해당 모드(mahjong_category)에 맞는 첫 번째 즐겨찾기가 있으면 highest_hu 대체
+    # 즐겨찾기(Favorite Hu) 확인: 등급전(type=2)에서 해당 모드(mahjong_category)에 맞는 첫 번째 즐겨찾기가 있으면 highest_hu 대체
     favorite_hu_list = profile.get("favorite_hu", [])
     for fav in favorite_hu_list:
-        # fav.category 1=4p, 2=3p
-        if fav.get("category") == mahjong_category:
+        # fav.category 1=4p, 2=3p / fav.type 2=등급전
+        # 등급전에서 설정된 하이라이트만 사용
+        if fav.get("category") == mahjong_category and fav.get("type") == 2:
             highest_hu = fav.get("hu")
             break
     
