@@ -9,13 +9,13 @@
 4인마작 배지:
 
 ```markdown
-![Mahjong Soul Badge](https://YOUR-DOMAIN/badge/<닉네임>)
+![Mahjong Soul Badge](https://clever-youthfulness-production-0095.up.railway.app/badge/<닉네임>)
 ```
 
 3인마작 배지:
 
 ```markdown
-![Mahjong Soul 3P Badge](https://YOUR-DOMAIN/badge3/<닉네임>)
+![Mahjong Soul 3P Badge](https://clever-youthfulness-production-0095.up.railway.app/badge3/<닉네임>)
 ```
 
 직접 SVG를 받고 싶으면 아래 엔드포인트를 쓰면 됩니다.
