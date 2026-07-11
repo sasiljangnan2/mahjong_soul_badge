@@ -320,7 +320,7 @@ def _avatar_icon_data_uri(avatar_id: int) -> str:
 
 
 # 배지 렌더링 상수
-MAX_BADGE_WIDTH = 450
+MAX_BADGE_WIDTH = 380
 MAX_BADGE_HEIGHT = 185
 
 def _build_badge_svg_mode(
@@ -389,7 +389,7 @@ def _build_badge_svg_mode(
         delay = 1.1 + i * 0.15
         sx = star_x0 + i * star_width + star_width / 2
         stars_svg += (
-            f"<text x='{sx:.1f}' y='80' fill='#fff4c5' font-size='16' "
+            f"<text x='{sx:.1f}' y='90' fill='#fff4c5' font-size='16' "
             f"text-anchor='middle' font-family='Segoe UI, Malgun Gothic, sans-serif' opacity='0'>"
             f"★<animate attributeName='opacity' from='0' to='1' dur='0.2s' begin='{delay}s' fill='freeze'/></text>"
         )
@@ -437,7 +437,7 @@ def _build_badge_svg_mode(
     # ── 차트 ─────────────────────────────────────────────────────────
     chart_x = 40
     chart_y = 118
-    chart_w = 390
+    chart_w = 320
     chart_h = 52
 
     polyline = ""
@@ -456,7 +456,7 @@ def _build_badge_svg_mode(
             "stroke='rgba(255,255,255,0.38)' stroke-dasharray='4 4'/>"
         )
         rank_labels += (
-            f"<text x='{chart_x - 10}' y='{y + 4:.1f}' fill='rgba(234,255,242,0.95)' "
+            f"<text x='{chart_x - 9}' y='{y + 4:.1f}' fill='rgba(234,255,242,0.95)' "
             "font-size='11' text-anchor='end' font-family='Segoe UI, Malgun Gothic, sans-serif'>"
             f"{rank_value}등</text>"
         )
@@ -494,8 +494,8 @@ def _build_badge_svg_mode(
   <!-- Profile Section -->
   <g opacity='0'>
     <animate attributeName='opacity' from='0' to='1' dur='0.5s' begin='0s' fill='freeze'/>
-    <text x='16' y='55' fill='#ffffff' font-size='32' font-family='Segoe UI, Malgun Gothic, sans-serif' font-weight='700'>{nickname}</text>
-    <text x='16' y='72' fill='#eafff2' font-size='16' font-family='Segoe UI, Malgun Gothic, sans-serif'>{escape(subtitle1)}</text>
+    <text x='55' y='45' fill='#ffffff' font-size='32' font-family='Segoe UI, Malgun Gothic, sans-serif' font-weight='700'>{nickname}</text>
+    <text x='55' y='62' fill='#eafff2' font-size='16' font-family='Segoe UI, Malgun Gothic, sans-serif'>{escape(subtitle1)}</text>
   </g>
   <!-- Stars -->
   {stars_svg}
@@ -507,8 +507,8 @@ def _build_badge_svg_mode(
   <!-- Rank Section - Icon -->
   <g opacity='0'>
     <animate attributeName='opacity' from='0' to='1' dur='0.3s' begin='0.8s' fill='freeze'/>
-    <rect x='337' y='10' width='100' height='100' rx='14' fill='rgba(255,255,255,0.18)' stroke='rgba(255,255,255,0.45)'/>
-    <image x='340' y='13' width='94' height='94' href='{icon_data_uri}' preserveAspectRatio='xMidYMid meet'/>
+    <rect x='257' y='10' width='100' height='100' rx='14' fill='rgba(255,255,255,0.18)' stroke='rgba(255,255,255,0.45)'/>
+    <image x='260' y='13' width='94' height='94' href='{icon_data_uri}' preserveAspectRatio='xMidYMid meet'/>
   </g>
   <!-- Chart Section -->
   <g opacity='0'>
