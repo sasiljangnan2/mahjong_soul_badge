@@ -1,7 +1,8 @@
 # Mahjong Soul Badge
 
 amae-koromo 공개 API의 작혼 전적을 SVG 배지로 보여주는 프로젝트입니다.
-
+![Mahjong Soul Badge](https://mahjongsoulbadge-production.up.railway.app/badge/Ssawaul)
+![Mahjong Soul 3P Badge](https://mahjongsoulbadge-production.up.railway.app/badge3/Ssawaul)
 ## 배지 사용법
 
 아래 주소를 GitHub README에 넣고 닉네임을 바꾸면 됩니다.
