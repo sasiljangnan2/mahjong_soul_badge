@@ -1,0 +1,245 @@
+amae-koromo API 실제 최신 10게임
+조회 시각: 2026-07-18 21:52 KST
+플레이어: Ssawaul
+account_id: 123973468
+
+선별 방법
+1. API의 latest_timestamp와 가까운 기간을 조회한다.
+2. 받은 player_records를 startTime 내림차순으로 정렬한다.
+3. 가장 최신인 10건을 선택한다.
+4. 아래 목록은 보기 편하도록 다시 과거 → 최신 순서로 표시한다.
+5. rank는 각 대국의 players를 score 내림차순으로 비교하여 계산한다.
+
+주의
+- date_kst는 한국 시간이다.
+- final_point는 게임 종료 시 소지 점수(players[].score)다.
+- grading_score는 등급 점수 증감(players[].gradingScore)이다.
+- 두 점수는 서로 다른 값이다.
+- 조회 대상은 현재 프로젝트가 사용하는 등급전 모드만 포함한다.
+
+======================================================================
+4인마작 최신 10게임
+======================================================================
+
+API 최종 기록 시각: 2026-07-03 01:32:49 KST
+
+[
+  {
+    "date_kst": "2026-04-25 18:51:34",
+    "start_time": 1777110694,
+    "uuid": "260425-edceae24-cbf1-4eff-8bb2-b9bfe232bbdb",
+    "mode_id": 12,
+    "rank": 3,
+    "final_point": 18300,
+    "grading_score": -11
+  },
+  {
+    "date_kst": "2026-04-25 20:14:34",
+    "start_time": 1777115674,
+    "uuid": "260425-21f89897-91fa-4940-9008-9bab532bab99",
+    "mode_id": 12,
+    "rank": 3,
+    "final_point": 5500,
+    "grading_score": -24
+  },
+  {
+    "date_kst": "2026-04-26 15:18:30",
+    "start_time": 1777184310,
+    "uuid": "260426-b3a1e01b-b20f-4db5-a919-5458b90a38a4",
+    "mode_id": 12,
+    "rank": 1,
+    "final_point": 53400,
+    "grading_score": 154
+  },
+  {
+    "date_kst": "2026-04-28 23:01:01",
+    "start_time": 1777384861,
+    "uuid": "260428-ca2f8dc4-df78-40b2-9494-ee294e51bd86",
+    "mode_id": 12,
+    "rank": 2,
+    "final_point": 25600,
+    "grading_score": 61
+  },
+  {
+    "date_kst": "2026-05-07 02:02:54",
+    "start_time": 1778086974,
+    "uuid": "260507-985d40e5-6eb4-4f30-af95-63cea51c4b17",
+    "mode_id": 12,
+    "rank": 2,
+    "final_point": 35400,
+    "grading_score": 71
+  },
+  {
+    "date_kst": "2026-05-15 02:09:46",
+    "start_time": 1778778586,
+    "uuid": "260515-825ebe59-38a8-4b53-a486-8f3facfccc38",
+    "mode_id": 12,
+    "rank": 4,
+    "final_point": 16400,
+    "grading_score": -188
+  },
+  {
+    "date_kst": "2026-05-23 17:50:27",
+    "start_time": 1779526227,
+    "uuid": "260523-568597da-0c4e-409a-ad2d-ef6fddce304c",
+    "mode_id": 9,
+    "rank": 1,
+    "final_point": 46600,
+    "grading_score": 117
+  },
+  {
+    "date_kst": "2026-06-03 00:45:36",
+    "start_time": 1780415136,
+    "uuid": "260602-0d3c7756-d8ae-4954-80a3-7cbdda19dcba",
+    "mode_id": 9,
+    "rank": 3,
+    "final_point": 24900,
+    "grading_score": -5
+  },
+  {
+    "date_kst": "2026-06-03 23:49:23",
+    "start_time": 1780498163,
+    "uuid": "260603-c9cbb758-da2f-403f-ade8-7021a97643be",
+    "mode_id": 9,
+    "rank": 3,
+    "final_point": 18300,
+    "grading_score": -11
+  },
+  {
+    "date_kst": "2026-07-03 01:32:49",
+    "start_time": 1783009969,
+    "uuid": "260703-1b9027ef-b61a-456d-ad62-8516ef0d41df",
+    "mode_id": 9,
+    "rank": 2,
+    "final_point": 39600,
+    "grading_score": 60
+  }
+]
+
+4인 최근 순위: 3, 3, 1, 2, 2, 4, 1, 3, 3, 2
+
+======================================================================
+3인마작 최신 10게임
+======================================================================
+
+API latest_timestamp: 1784373599
+API 최종 기록 시각: 2026-07-18 20:19:59 KST
+최종 기록 근처 10일 조회 건수: 42건
+
+[
+  {
+    "date_kst": "2026-07-16 21:07:24",
+    "start_time": 1784203644,
+    "uuid": "260716-2583c3ce-d1b0-4b21-b972-56c1a441de07",
+    "mode_id": 21,
+    "rank": 2,
+    "final_point": 37100,
+    "grading_score": 3
+  },
+  {
+    "date_kst": "2026-07-17 01:26:24",
+    "start_time": 1784219184,
+    "uuid": "260717-0309ca0f-5ec6-4288-91c0-6e6327a6c9d3",
+    "mode_id": 21,
+    "rank": 1,
+    "final_point": 42600,
+    "grading_score": 78
+  },
+  {
+    "date_kst": "2026-07-17 01:33:27",
+    "start_time": 1784219607,
+    "uuid": "260717-ef90a294-33df-46ad-825a-6545fced5781",
+    "mode_id": 21,
+    "rank": 2,
+    "final_point": 30000,
+    "grading_score": -5
+  },
+  {
+    "date_kst": "2026-07-17 17:16:31",
+    "start_time": 1784276191,
+    "uuid": "260717-cace515e-4453-4d4a-a0b8-ca4babae6366",
+    "mode_id": 21,
+    "rank": 1,
+    "final_point": 57800,
+    "grading_score": 93
+  },
+  {
+    "date_kst": "2026-07-17 17:24:30",
+    "start_time": 1784276670,
+    "uuid": "260717-63088cce-1fba-4053-952f-c1f699a35429",
+    "mode_id": 21,
+    "rank": 3,
+    "final_point": 29400,
+    "grading_score": -80
+  },
+  {
+    "date_kst": "2026-07-17 17:32:20",
+    "start_time": 1784277140,
+    "uuid": "260717-f78c8a05-880e-432a-a5e2-913b9cd136d6",
+    "mode_id": 21,
+    "rank": 3,
+    "final_point": -3500,
+    "grading_score": -113
+  },
+  {
+    "date_kst": "2026-07-17 18:07:03",
+    "start_time": 1784279223,
+    "uuid": "260717-4215fc62-ac8b-4f1f-a32c-5ee7121f7a64",
+    "mode_id": 21,
+    "rank": 3,
+    "final_point": 22800,
+    "grading_score": -87
+  },
+  {
+    "date_kst": "2026-07-18 19:54:22",
+    "start_time": 1784372062,
+    "uuid": "260718-dc060cd0-5035-4c2d-8682-380f1e28f3fa",
+    "mode_id": 21,
+    "rank": 2,
+    "final_point": 35100,
+    "grading_score": 1
+  },
+  {
+    "date_kst": "2026-07-18 20:07:11",
+    "start_time": 1784372831,
+    "uuid": "260718-6b85e6fd-70ad-46d7-b00e-f89f4896e1d9",
+    "mode_id": 21,
+    "rank": 3,
+    "final_point": -9600,
+    "grading_score": -119
+  },
+  {
+    "date_kst": "2026-07-18 20:19:59",
+    "start_time": 1784373599,
+    "uuid": "260718-c630d74e-beca-4695-9c9f-b669b0fe9c1e",
+    "mode_id": 21,
+    "rank": 1,
+    "final_point": 51400,
+    "grading_score": 87
+  }
+]
+
+3인 최근 순위: 2, 1, 2, 1, 3, 3, 3, 2, 3, 1
+
+======================================================================
+프로젝트에서 적용해야 하는 핵심
+======================================================================
+
+현재처럼 2년 범위에 limit=10을 사용하면 범위의 첫 10게임이 반환될 수 있다.
+따라서 다음 방식이 필요하다.
+
+1. search_player의 latest_timestamp를 확인한다.
+2. latest_timestamp 직전의 짧은 기간부터 player_records를 조회한다.
+3. 기록이 10개보다 적으면 조회 시작일을 과거로 단계적으로 넓힌다.
+4. startTime 내림차순 정렬 후 앞의 10개만 선택한다.
+5. 화면에 과거 → 최신 순서가 필요하면 선택이 끝난 뒤 한 번만 뒤집는다.
+
+의사 코드:
+
+records = fetch_records(start=latest_timestamp - window, end=latest_timestamp + 1)
+while len(records) < 10:
+    window *= 2
+    records = fetch_records(start=latest_timestamp - window, end=latest_timestamp + 1)
+
+latest_10 = sorted(records, key=lambda game: game["startTime"], reverse=True)[:10]
+display_games = list(reversed(latest_10))

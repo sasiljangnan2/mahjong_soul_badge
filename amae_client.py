@@ -83,17 +83,58 @@ async def _fetch_records(
     account_id: int,
     base: str,
     modes: str,
-    limit: int = 10,
+    start_t: int,
+    end_t: int,
+    limit: int = 500,
 ) -> list:
-    """최근 게임 기록. 순서는 오래된 것 → 최신."""
-    end_t = int(time.time()) + 86400
-    start_t = end_t - 86400 * 365 * 2
+    """지정한 기간의 게임 기록을 가져온다."""
     url = f"{base}/player_records/{account_id}/{start_t}/{end_t}?limit={limit}&mode={modes}"
     async with session.get(url) as r:
         if r.status != 200:
             return []
         data = await r.json()
         return data if isinstance(data, list) else []
+
+
+async def _fetch_latest_records(
+    session: aiohttp.ClientSession,
+    account_id: int,
+    base: str,
+    modes: str,
+    count: int,
+    latest_timestamp: int | None = None,
+) -> list:
+    """API가 오래된 기록부터 반환해도 실제 최신 count개를 선별한다."""
+    anchor = int(latest_timestamp or time.time())
+    window = 86400 * 7
+    max_window = 86400 * 365 * 2
+    minimum_window = 3600
+
+    while True:
+        start_t = max(0, anchor - window)
+        records = await _fetch_records(
+            session,
+            account_id,
+            base,
+            modes,
+            start_t,
+            anchor + 86400,
+        )
+
+        # 서버 반환 한도(500개)에 걸렸다면 기간을 줄여 최신 끝부분이
+        # 응답에 포함되도록 한다.
+        if len(records) >= 500 and window > minimum_window:
+            window = max(minimum_window, window // 2)
+            continue
+
+        if len(records) >= count or window >= max_window:
+            return sorted(
+                records,
+                key=lambda record: int(record.get("startTime") or 0),
+                reverse=True,
+            )[:count]
+
+        window = min(max_window, window * 2)
 
 
 def _rank_from_record(record: dict, account_id: int) -> int:
@@ -111,12 +152,14 @@ def _records_to_recent_games(records: list, account_id: int, max_rank: int) -> l
     result = []
     for rec in records:
         rank = _rank_from_record(rec, account_id)
+        player = next(
+            (p for p in rec.get("players", []) if p.get("accountId") == account_id),
+            {},
+        )
         result.append({
             "rank": min(rank, max_rank),
-            "final_point": next(
-                (p.get("score", 0) for p in rec.get("players", []) if p.get("accountId") == account_id),
-                0,
-            ),
+            "final_point": player.get("score", 0),
+            "grading_score": player.get("gradingScore", 0),
             "game_category": 2,  # 등급전
             "start_time": rec.get("startTime"),
             "mode_id": rec.get("modeId"),
@@ -151,11 +194,7 @@ async def fetch_summary(
             pass
 
         # ── 4P 통계 ─────────────────────────────────────────────────
-        if player_4p is None:
-            # stats에서 level/score 가져오기
-            stats_4p = await _fetch_stats(session, account_id, _BASE4, _MODES_4P)
-        else:
-            stats_4p = player_4p  # search 결과에 level 포함
+        stats_4p = await _fetch_stats(session, account_id, _BASE4, _MODES_4P)
 
         if stats_4p is None:
             raise RuntimeError(f"Cannot fetch 4P stats for account_id={account_id}")
@@ -178,6 +217,11 @@ async def fetch_summary(
         else:
             rank_3p = _build_rank_info(0, 0)
 
+        # search_player의 latest_timestamp를 최신 기록 조회 기준점으로 사용한다.
+        if player_4p is None and actual_nickname:
+            player_4p = await _search_player(session, actual_nickname, _BASE4)
+        player_3p = await _search_player(session, actual_nickname, _BASE3)
+
         # ── 최근 4P 게임 기록 ────────────────────────────────────────
         # played_modes 가 있으면 그 모드만, 없으면 전체 모드 시도
         played_modes = stats_4p.get("played_modes") if isinstance(stats_4p, dict) else None
@@ -186,7 +230,14 @@ async def fetch_summary(
         else:
             modes_str = _MODES_4P
 
-        records_4p = await _fetch_records(session, account_id, _BASE4, modes_str, recent_count)
+        records_4p = await _fetch_latest_records(
+            session,
+            account_id,
+            _BASE4,
+            modes_str,
+            recent_count,
+            int(player_4p.get("latest_timestamp", 0)) if player_4p else None,
+        )
         recent_4p = _records_to_recent_games(records_4p, account_id, 4)
 
         # ── 최근 3P 게임 기록 ────────────────────────────────────────
@@ -195,7 +246,14 @@ async def fetch_summary(
             modes3_str = ",".join(str(m) for m in played_modes_3p)
         else:
             modes3_str = _MODES_3P
-        records_3p = await _fetch_records(session, account_id, _BASE3, modes3_str, recent_count)
+        records_3p = await _fetch_latest_records(
+            session,
+            account_id,
+            _BASE3,
+            modes3_str,
+            recent_count,
+            int(player_3p.get("latest_timestamp", 0)) if player_3p else None,
+        )
         recent_3p = _records_to_recent_games(records_3p, account_id, 3)
 
     queried_at = datetime.now(timezone.utc).isoformat()

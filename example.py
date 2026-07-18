@@ -4,7 +4,7 @@ import logging
 import sys
 from optparse import OptionParser
 
-from majsoul_client import fetch_summary
+from amae_client import fetch_summary
 
 
 def setup_logging(log_file=None, quiet=False):
@@ -33,9 +33,7 @@ def setup_logging(log_file=None, quiet=False):
 
 async def main():
     parser = OptionParser()
-    parser.add_option("-u", "--username", type="string", help="Login account.")
-    parser.add_option("-p", "--password", type="string", help="Login password.")
-    parser.add_option("--target-nickname", type="string", help="Target nickname.")
+    parser.add_option("--nickname", type="string", help="Target nickname.")
     parser.add_option("-n", "--recent-count", type="int", default=10, help="Recent count for each (3p/4p).")
     parser.add_option("--quiet", action="store_true", help="Show only warnings/errors in terminal.")
     parser.add_option("--log-file", type="string", help="Write detailed logs to a file.")
@@ -43,15 +41,11 @@ async def main():
     opts, _ = parser.parse_args()
     setup_logging(log_file=opts.log_file, quiet=opts.quiet)
 
-    username = opts.username
-    password = opts.password
-    if not username or not password:
-        parser.error("Username and password are required")
+    if not opts.nickname:
+        parser.error("Nickname is required")
 
     summary = await fetch_summary(
-        username=username,
-        password=password,
-        target_nickname=opts.target_nickname,
+        nickname=opts.nickname,
         recent_count=opts.recent_count,
     )
     logging.info("%s", json.dumps(summary, ensure_ascii=False, indent=2))

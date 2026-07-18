@@ -1,6 +1,6 @@
 # Mahjong Soul Badge
 
-작혼 전적을 SVG 배지로 보여주는 프로젝트입니다. 현재 구현은 직접 로그인 방식이 아니라 amae-koromo 공개 API를 사용합니다.
+amae-koromo 공개 API의 작혼 전적을 SVG 배지로 보여주는 프로젝트입니다.
 
 ## 배지 사용법
 
