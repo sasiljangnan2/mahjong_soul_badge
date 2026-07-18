@@ -167,6 +167,18 @@ def _records_to_recent_games(records: list, account_id: int, max_rank: int) -> l
     return result
 
 
+def _apply_latest_grading_score(rank_info: dict, recent_games: list) -> None:
+    """API 등급 점수에 가장 최근 대국의 등급 점수 증감을 반영한다."""
+    base_score = int(rank_info.get("score") or 0)
+    latest_delta = 0
+    if recent_games:
+        latest_delta = int(recent_games[0].get("grading_score") or 0)
+
+    rank_info["base_score"] = base_score
+    rank_info["latest_grading_score"] = latest_delta
+    rank_info["score"] = base_score + latest_delta
+
+
 async def fetch_summary(
     nickname: str | None = None,
     account_id: int | None = None,
@@ -255,6 +267,10 @@ async def fetch_summary(
             int(player_3p.get("latest_timestamp", 0)) if player_3p else None,
         )
         recent_3p = _records_to_recent_games(records_3p, account_id, 3)
+
+        # 배지 점수 = API 등급 점수 + 가장 최근 대국의 등급 점수 증감
+        _apply_latest_grading_score(rank_4p, recent_4p)
+        _apply_latest_grading_score(rank_3p, recent_3p)
 
     queried_at = datetime.now(timezone.utc).isoformat()
 
