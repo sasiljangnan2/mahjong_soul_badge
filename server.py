@@ -73,6 +73,7 @@ _RANK_SCORE_RANGES: dict[tuple[int, int], tuple[int, int]] = {
 }
 
 SYNC_INTERVAL_SECONDS = int(os.environ.get("SYNC_INTERVAL", 86400))  # 기본 24시간
+CACHE_MAX_AGE_SECONDS = int(os.environ.get("CACHE_MAX_AGE", 300))  # 요청 시 최대 5분 캐시
 
 
 async def _background_sync_all() -> None:
@@ -224,17 +225,29 @@ def _save_summary(summary: dict, aliases: list[str] | None = None) -> dict:
 
 async def _load_or_auto_sync(nickname: str, force: bool = True) -> dict:
     """amae-koromo API로 플레이어 데이터를 조회한다.
-    force=False이면 캐시가 있으면 반환하고, 없으면 새로 조회."""
+    force=False이면 최신 캐시는 반환하고, 오래된 캐시는 자동 갱신한다."""
+    cached_payload = None
     if not force:
         account_id = _find_account_id_by_nickname(nickname)
         if account_id is not None:
             file_path = _player_file(account_id)
             if file_path.exists():
-                return json.loads(file_path.read_text(encoding="utf-8"))
+                cached_payload = json.loads(file_path.read_text(encoding="utf-8"))
+                try:
+                    updated_at = datetime.fromisoformat(cached_payload.get("updated_at", ""))
+                    age_seconds = (datetime.now(timezone.utc) - updated_at).total_seconds()
+                    if age_seconds < CACHE_MAX_AGE_SECONDS:
+                        return cached_payload
+                except (TypeError, ValueError):
+                    pass
 
     try:
         summary = await fetch_summary(nickname=nickname, recent_count=10)
     except Exception as exc:
+        # 외부 API가 잠시 실패해도 저장된 배지는 계속 표시한다.
+        if cached_payload is not None:
+            logger.warning("캐시 갱신 실패, 기존 데이터 사용 (%s): %s", nickname, exc)
+            return cached_payload
         raise HTTPException(status_code=503, detail=f"Auto-sync failed: {exc}")
 
     return _save_summary(summary, aliases=[nickname])
@@ -559,10 +572,9 @@ def _badge_response(request: Request, svg: str, updated_at: str) -> Response:
         last_modified = formatdate(usegmt=True)
 
     headers = {
-        # max-age=1800: 브라우저 30분 캐시
-        # s-maxage=1800: GitHub Camo 등 CDN 프록시 30분마다 재검증 (mazassumnida 방식)
+        # 브라우저와 CDN도 서버 데이터 캐시 주기에 맞춰 5분마다 재검증한다.
         # stale-while-revalidate=60: 재검증 중에도 기존 캐시 즉시 반환
-        "Cache-Control": "max-age=1800, s-maxage=1800, stale-while-revalidate=60",
+        "Cache-Control": "max-age=300, s-maxage=300, stale-while-revalidate=60",
         "ETag": etag,
         "Last-Modified": last_modified,
     }
