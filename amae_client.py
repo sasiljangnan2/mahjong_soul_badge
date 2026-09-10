@@ -3,6 +3,8 @@
 로그인 불필요 - 마작소울 인증 없이 동작.
 """
 
+import asyncio
+import os
 import time
 import urllib.parse
 from datetime import datetime, timezone
@@ -16,6 +18,33 @@ _BASE3 = "https://ak-data-1.sapk.ch/api/v2/pl3"
 # amae-koromo 가 다루는 4P 등급전 모드 ID (金の間 동/서, 玉の間 동/서, 王座の間 동/서)
 _MODES_4P = "9,8,12,11,16,15"
 _MODES_3P = "22,21,24,23,26,25"
+_API_TOKEN = os.environ.get("AMAE_API_TOKEN", "").strip()
+_REQUEST_LOCK = asyncio.Lock()
+_LAST_REQUEST_AT = 0.0
+
+
+async def _api_get(session: aiohttp.ClientSession, url: str) -> tuple[int, object | None, str]:
+    """Bearer 인증을 적용하고 프로세스 전체 요청 속도를 최대 1 QPS로 제한한다."""
+    global _LAST_REQUEST_AT
+
+    headers = {"Authorization": f"Bearer {_API_TOKEN}"} if _API_TOKEN else {}
+    async with _REQUEST_LOCK:
+        wait_seconds = 1.0 - (time.monotonic() - _LAST_REQUEST_AT)
+        if wait_seconds > 0:
+            await asyncio.sleep(wait_seconds)
+
+        try:
+            async with session.get(url, headers=headers) as response:
+                body = await response.text()
+                data = None
+                if response.status == 200:
+                    try:
+                        data = await response.json()
+                    except (aiohttp.ContentTypeError, ValueError):
+                        pass
+                return response.status, data, body
+        finally:
+            _LAST_REQUEST_AT = time.monotonic()
 
 RANK_TIER_NAMES_KO = {
     1: "초심",
@@ -54,17 +83,16 @@ async def _search_player(session: aiohttp.ClientSession, nickname: str, base: st
     """닉네임으로 플레이어 검색. 없으면 None."""
     encoded = urllib.parse.quote(nickname)
     url = f"{base}/search_player/{encoded}"
-    async with session.get(url) as r:
-        if r.status != 200:
-            return None
-        data = await r.json()
-        if not data:
-            return None
-        # 정확히 일치하는 닉네임 우선
-        for item in data:
-            if item.get("nickname") == nickname:
-                return item
-        return data[0]
+    status, data, _ = await _api_get(session, url)
+    if status != 200:
+        return None
+    if not data:
+        return None
+    # 정확히 일치하는 닉네임 우선
+    for item in data:
+        if item.get("nickname") == nickname:
+            return item
+    return data[0]
 
 
 async def _fetch_stats(session: aiohttp.ClientSession, account_id: int, base: str, modes: str) -> dict | None:
@@ -72,10 +100,8 @@ async def _fetch_stats(session: aiohttp.ClientSession, account_id: int, base: st
     end_t = int(time.time()) + 86400
     start_t = end_t - 86400 * 365 * 2  # 2년치
     url = f"{base}/player_stats/{account_id}/{start_t}/{end_t}?mode={modes}"
-    async with session.get(url) as r:
-        if r.status != 200:
-            return None
-        return await r.json()
+    status, data, _ = await _api_get(session, url)
+    return data if status == 200 and isinstance(data, dict) else None
 
 
 async def _fetch_records(
@@ -86,14 +112,14 @@ async def _fetch_records(
     start_t: int,
     end_t: int,
     limit: int = 500,
-) -> list:
+) -> tuple[list, str | None]:
     """지정한 기간의 게임 기록을 가져온다."""
     url = f"{base}/player_records/{account_id}/{start_t}/{end_t}?limit={limit}&mode={modes}"
-    async with session.get(url) as r:
-        if r.status != 200:
-            return []
-        data = await r.json()
-        return data if isinstance(data, list) else []
+    status, data, body = await _api_get(session, url)
+    if status != 200:
+        detail = body.strip().replace("\n", " ")[:200]
+        return [], f"HTTP {status}: {detail}"
+    return (data if isinstance(data, list) else []), None
 
 
 async def _fetch_latest_records(
@@ -103,7 +129,7 @@ async def _fetch_latest_records(
     modes: str,
     count: int,
     latest_timestamp: int | None = None,
-) -> list:
+) -> tuple[list, str | None]:
     """API가 오래된 기록부터 반환해도 실제 최신 count개를 선별한다."""
     anchor = int(latest_timestamp or time.time())
     window = 86400 * 7
@@ -112,7 +138,7 @@ async def _fetch_latest_records(
 
     while True:
         start_t = max(0, anchor - window)
-        records = await _fetch_records(
+        records, error = await _fetch_records(
             session,
             account_id,
             base,
@@ -120,6 +146,8 @@ async def _fetch_latest_records(
             start_t,
             anchor + 86400,
         )
+        if error:
+            return [], error
 
         # 서버 반환 한도(500개)에 걸렸다면 기간을 줄여 최신 끝부분이
         # 응답에 포함되도록 한다.
@@ -128,11 +156,12 @@ async def _fetch_latest_records(
             continue
 
         if len(records) >= count or window >= max_window:
-            return sorted(
+            latest = sorted(
                 records,
                 key=lambda record: int(record.get("startTime") or 0),
                 reverse=True,
             )[:count]
+            return latest, None
 
         window = min(max_window, window * 2)
 
@@ -242,7 +271,7 @@ async def fetch_summary(
         else:
             modes_str = _MODES_4P
 
-        records_4p = await _fetch_latest_records(
+        records_4p, records_error_4p = await _fetch_latest_records(
             session,
             account_id,
             _BASE4,
@@ -258,7 +287,7 @@ async def fetch_summary(
             modes3_str = ",".join(str(m) for m in played_modes_3p)
         else:
             modes3_str = _MODES_3P
-        records_3p = await _fetch_latest_records(
+        records_3p, records_error_3p = await _fetch_latest_records(
             session,
             account_id,
             _BASE3,
@@ -298,10 +327,34 @@ async def fetch_summary(
                 "highest_hu": None,
             },
         },
+        "stats": {
+            "four_player": {
+                "count": stats_4p.get("count", 0),
+                "rank_rates": stats_4p.get("rank_rates", []),
+                "avg_rank": stats_4p.get("avg_rank"),
+                "negative_rate": stats_4p.get("negative_rate"),
+            },
+            "three_player": {
+                "count": stats_3p.get("count", 0) if stats_3p else 0,
+                "rank_rates": stats_3p.get("rank_rates", []) if stats_3p else [],
+                "avg_rank": stats_3p.get("avg_rank") if stats_3p else None,
+                "negative_rate": stats_3p.get("negative_rate") if stats_3p else None,
+            },
+        },
         "source": "amae-koromo",
         "meta": {
             "queried_at": queried_at,
             "host": "amae-koromo",
             "auth_method": "none",
+            "records": {
+                "four_player": {
+                    "available": records_error_4p is None,
+                    "error": records_error_4p,
+                },
+                "three_player": {
+                    "available": records_error_3p is None,
+                    "error": records_error_3p,
+                },
+            },
         },
     }

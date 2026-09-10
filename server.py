@@ -176,6 +176,15 @@ def _save_summary(summary: dict, aliases: list[str] | None = None) -> dict:
     PLAYERS_DIR.mkdir(parents=True, exist_ok=True)
     account_id = summary["account"]["account_id"]
     nickname = summary["account"].get("nickname")
+
+    # player_records가 CAPTCHA로 차단되면 기존 최근 대국을 보존한다.
+    previous_summary = {}
+    existing_file = _player_file(account_id)
+    if existing_file.exists():
+        try:
+            previous_summary = json.loads(existing_file.read_text(encoding="utf-8")).get("summary", {})
+        except Exception:
+            previous_summary = {}
     
     # 데이터 형식 정규화: recent_games를 새로운 형식으로 통일
     recent_games_raw = summary.get("recent_games", {})
@@ -192,6 +201,14 @@ def _save_summary(summary: dict, aliases: list[str] | None = None) -> dict:
         else:
             # 새로운 형식: 그대로 사용
             recent_games_normalized[key] = recent_games_raw[key]
+
+        records_state = (summary.get("meta", {}).get("records", {}).get(key) or {})
+        incoming_games = recent_games_normalized[key].get("recent_games") or []
+        if records_state.get("available") is False and not incoming_games:
+            previous_category = (previous_summary.get("recent_games", {}).get(key) or {})
+            previous_games = previous_category.get("recent_games") if isinstance(previous_category, dict) else previous_category
+            if previous_games:
+                recent_games_normalized[key] = previous_category
     
     # 정규화된 데이터로 summary 업데이트
     summary_normalized = {**summary, "recent_games": recent_games_normalized}
@@ -283,6 +300,8 @@ def _build_public_profile(payload: dict) -> dict:
         "rank_3p": account.get("rank_3p", {}),
         "achievement_total": (account.get("achievement") or {}).get("total"),
         "recent_games": recent_games_normalized,
+        "stats": summary.get("stats", {}),
+        "records_status": (summary.get("meta", {}).get("records", {})),
         # 즐겨찾기(하이라이트) 정보 추가 - 등급전(type=1)만 필터링
         "favorite_hu": [
             fav for fav in account.get("favorite_hu", [])
@@ -447,6 +466,9 @@ def _build_badge_svg_mode(
         value = int(item.get("rank", max_rank))
         ranks.append(max(1, min(max_rank, value)))
 
+    stats_data = (profile.get("stats") or {}).get(recent_key) or {}
+    rank_rates = stats_data.get("rank_rates") or []
+
     # ── 차트 ─────────────────────────────────────────────────────────
     chart_x = 40
     chart_y = 118
@@ -457,6 +479,7 @@ def _build_badge_svg_mode(
     rank_grid_lines = ""
     rank_labels = ""
     point_dots = ""
+    fallback_stats_svg = ""
 
     def y_from_rank(rank_value: int) -> float:
         denominator = max(1, max_rank - 1)
@@ -490,6 +513,19 @@ def _build_badge_svg_mode(
                 f"<animate attributeName='r' values='1.2;5.5;3.6' keyTimes='0;0.5;1' dur='0.8s' begin='{delay}s' fill='freeze'/>"
                 f"</circle>"
             )
+    elif rank_rates:
+        rank_grid_lines = ""
+        rank_labels = ""
+        rate_parts = [f"{idx + 1}위 {float(rate) * 100:.1f}%" for idx, rate in enumerate(rank_rates[:max_rank])]
+        rate_text = escape(" · ".join(rate_parts))
+        avg_rank = stats_data.get("avg_rank")
+        avg_text = f"평균 순위 {float(avg_rank):.2f}" if avg_rank is not None else "최근 대국 조회 제한"
+        fallback_stats_svg = (
+            f"<text x='{chart_x + chart_w / 2:.1f}' y='{chart_y + 22}' text-anchor='middle' "
+            f"fill='#ffffff' font-size='13' font-family='Segoe UI, Malgun Gothic, sans-serif'>{rate_text}</text>"
+            f"<text x='{chart_x + chart_w / 2:.1f}' y='{chart_y + 41}' text-anchor='middle' "
+            f"fill='rgba(234,255,242,0.9)' font-size='12' font-family='Segoe UI, Malgun Gothic, sans-serif'>{escape(avg_text)}</text>"
+        )
 
     return f"""<svg xmlns='http://www.w3.org/2000/svg' width='{MAX_BADGE_WIDTH}' height='{MAX_BADGE_HEIGHT}' role='img' aria-label='Majsoul profile badge'>
   <defs>
@@ -529,6 +565,7 @@ def _build_badge_svg_mode(
     <rect x='{chart_x}' y='{chart_y}' width='{chart_w}' height='{chart_h}' rx='8' fill='rgba(255,255,255,0.14)'/>
     {rank_grid_lines}
     {rank_labels}
+    {fallback_stats_svg}
   </g>
   <!-- Graph Line and Points -->
   <polyline points='{polyline}' fill='none' stroke='url(#lineg)' stroke-width='3' stroke-linecap='round' stroke-linejoin='round' stroke-dasharray='1000' stroke-dashoffset='1000'>
