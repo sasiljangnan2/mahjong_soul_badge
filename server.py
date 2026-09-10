@@ -418,15 +418,24 @@ def _build_badge_svg_mode(
     star_width = 16
     # 등급 오른쪽에 항상 3칸을 표시하고, 미획득 별은 회색으로 채운다.
     star_x0 = 108
-    for i in range(star_slots):
-        delay = 1.1 + i * 0.15
-        sx = star_x0 + i * star_width + star_width / 2
-        star_color = "#ffd65c" if i < visible_stars else "#626863"
-        stars_svg += (
-            f"<text x='{sx:.1f}' y='50' fill='{star_color}' font-size='16' "
-            f"text-anchor='middle' font-family='Segoe UI, Malgun Gothic, sans-serif' opacity='0'>"
-            f"★<animate attributeName='opacity' from='0' to='1' dur='0.2s' begin='{delay}s' fill='freeze'/></text>"
+    if tier >= 6:
+        stars_svg = (
+            "<g transform='translate(120 45)' fill='#bda8ff' stroke='#ebe5ff' stroke-width='0.7' opacity='0'>"
+            "<ellipse cx='0' cy='-5' rx='3.2' ry='5'/><ellipse cx='0' cy='-5' rx='3.2' ry='5' transform='rotate(72)'/>"
+            "<ellipse cx='0' cy='-5' rx='3.2' ry='5' transform='rotate(144)'/><ellipse cx='0' cy='-5' rx='3.2' ry='5' transform='rotate(216)'/>"
+            "<ellipse cx='0' cy='-5' rx='3.2' ry='5' transform='rotate(288)'/><circle cx='0' cy='0' r='2.2' fill='#fff4b8' stroke='none'/>"
+            "<animate attributeName='opacity' from='0' to='1' dur='0.25s' begin='1.1s' fill='freeze'/></g>"
         )
+    else:
+        for i in range(star_slots):
+            delay = 1.1 + i * 0.15
+            sx = star_x0 + i * star_width + star_width / 2
+            star_color = "#ffd65c" if i < visible_stars else "#626863"
+            stars_svg += (
+                f"<text x='{sx:.1f}' y='50' fill='{star_color}' font-size='16' "
+                f"text-anchor='middle' font-family='Segoe UI, Malgun Gothic, sans-serif' opacity='0'>"
+                f"★<animate attributeName='opacity' from='0' to='1' dur='0.2s' begin='{delay}s' fill='freeze'/></text>"
+            )
 
     # ── 게이지 ──────────────────────────────────────────────────────
     score_int = 0
