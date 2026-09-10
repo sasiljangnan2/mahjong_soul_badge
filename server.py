@@ -352,8 +352,8 @@ def _avatar_icon_data_uri(avatar_id: int) -> str:
 
 
 # 배지 렌더링 상수
-MAX_BADGE_WIDTH = 400
-MAX_BADGE_HEIGHT = 105
+MAX_BADGE_WIDTH = 420
+MAX_BADGE_HEIGHT = 110
 BADGE_VIEW_WIDTH = 600
 BADGE_VIEW_HEIGHT = 158
 
@@ -447,7 +447,7 @@ def _build_badge_svg_mode(
         delta_text = f"▼ {latest_delta}"
         delta_color = "#ff7181"
     else:
-        delta_text = "― 0"
+        delta_text = "변동 없음"
         delta_color = "#8f9893"
 
     score_range = _RANK_SCORE_RANGES.get((tier, star))
