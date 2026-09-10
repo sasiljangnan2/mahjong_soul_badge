@@ -362,7 +362,6 @@ def _build_badge_svg_mode(
     mode_label: str,
     max_rank: int,
     icon_data_uri: str,
-    mahjong_category: int  # 1 for 4-player, 2 for 3-player
 ) -> str:
     nickname = escape(str(profile.get("nickname") or "Unknown"))
     rank_data = profile.get(rank_key) or {}
@@ -456,14 +455,19 @@ def _build_badge_svg_mode(
         recent_games = category_data[:10]
     else:
         raw_games = category_data.get("recent_games") or []
-        recent_games = [g for g in raw_games if g.get("game_category", 2) == 2][:10]
+        # four_player/three_player 키에서 이미 모드가 분리되어 있다. API 형식이
+        # 바뀌어 game_category가 없거나 다른 값이어도 최근 순위 그래프는 그린다.
+        recent_games = [g for g in raw_games if isinstance(g, dict)][:10]
 
     recent_games = list(reversed(recent_games))
     ranks = []
     for item in recent_games:
         if not isinstance(item, dict):
             continue
-        value = int(item.get("rank", max_rank))
+        try:
+            value = int(item.get("rank", max_rank))
+        except (TypeError, ValueError):
+            continue
         ranks.append(max(1, min(max_rank, value)))
 
     stats_data = (profile.get("stats") or {}).get(recent_key) or {}
@@ -583,7 +587,6 @@ def _build_badge_svg(profile: dict) -> str:
         mode_label="4인",
         max_rank=4,
         icon_data_uri=_rank_icon_data_uri(int((profile.get("rank_4p") or {}).get("tier") or 0)),
-        mahjong_category=1,
     )
 
 
@@ -595,7 +598,6 @@ def _build_badge3_svg(profile: dict) -> str:
         mode_label="3인",
         max_rank=3,
         icon_data_uri=_3rank_icon_data_uri(int((profile.get("rank_3p") or {}).get("tier") or 0)),
-        mahjong_category=2,
     )
 
 

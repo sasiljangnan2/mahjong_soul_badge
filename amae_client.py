@@ -18,16 +18,33 @@ _BASE3 = "https://ak-data-1.sapk.ch/api/v2/pl3"
 # amae-koromo 가 다루는 4P 등급전 모드 ID (金の間 동/서, 玉の間 동/서, 王座の間 동/서)
 _MODES_4P = "9,8,12,11,16,15"
 _MODES_3P = "22,21,24,23,26,25"
-_API_TOKEN = os.environ.get("AMAE_API_TOKEN", "").strip()
+def _normalize_api_token(value: str) -> str:
+    """환경변수에 raw token 또는 'Authorization: Bearer ...'를 넣어도 처리한다."""
+    token = (value or "").strip().strip('"').strip("'")
+    if token.lower().startswith("authorization:"):
+        token = token.split(":", 1)[1].strip()
+    if token.lower().startswith("bearer "):
+        token = token[7:].strip()
+    return token
+
+
+_API_TOKEN = _normalize_api_token(
+    os.environ.get("AMAE_API_TOKEN") or os.environ.get("AMAE_CAP_TOKEN", "")
+)
 _REQUEST_LOCK = asyncio.Lock()
 _LAST_REQUEST_AT = 0.0
 
 
-async def _api_get(session: aiohttp.ClientSession, url: str) -> tuple[int, object | None, str]:
+async def _api_get(
+    session: aiohttp.ClientSession,
+    url: str,
+    *,
+    authenticated: bool = False,
+) -> tuple[int, object | None, str]:
     """Bearer 인증을 적용하고 프로세스 전체 요청 속도를 최대 1 QPS로 제한한다."""
     global _LAST_REQUEST_AT
 
-    headers = {"Authorization": f"Bearer {_API_TOKEN}"} if _API_TOKEN else {}
+    headers = {"Authorization": f"Bearer {_API_TOKEN}"} if authenticated and _API_TOKEN else {}
     async with _REQUEST_LOCK:
         wait_seconds = 1.0 - (time.monotonic() - _LAST_REQUEST_AT)
         if wait_seconds > 0:
@@ -115,7 +132,7 @@ async def _fetch_records(
 ) -> tuple[list, str | None]:
     """지정한 기간의 게임 기록을 가져온다."""
     url = f"{base}/player_records/{account_id}/{start_t}/{end_t}?limit={limit}&mode={modes}"
-    status, data, body = await _api_get(session, url)
+    status, data, body = await _api_get(session, url, authenticated=True)
     if status != 200:
         detail = body.strip().replace("\n", " ")[:200]
         return [], f"HTTP {status}: {detail}"
