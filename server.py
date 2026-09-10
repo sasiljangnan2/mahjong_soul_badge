@@ -1,3 +1,4 @@
+import asyncio
 import base64
 import hashlib
 import json
@@ -71,6 +72,7 @@ _RANK_SCORE_RANGES: dict[tuple[int, int], tuple[int, int]] = {
 }
 
 CACHE_MAX_AGE_SECONDS = int(os.environ.get("CACHE_MAX_AGE", 300))  # 요청 시 최대 5분 캐시
+_refresh_tasks: dict[str, asyncio.Task] = {}
 
 
 app = FastAPI(title="Majsoul Badge API", version="0.1.0")
@@ -198,6 +200,25 @@ def _save_summary(summary: dict, aliases: list[str] | None = None) -> dict:
     return payload
 
 
+async def _refresh_cached_player(nickname: str) -> None:
+    """캐시를 사용하는 요청과 분리해 플레이어 데이터를 갱신한다."""
+    try:
+        summary = await fetch_summary(nickname=nickname, recent_count=10)
+        _save_summary(summary, aliases=[nickname])
+    except Exception as exc:
+        logger.warning("백그라운드 캐시 갱신 실패 (%s): %s", nickname, exc)
+    finally:
+        _refresh_tasks.pop(nickname.casefold(), None)
+
+
+def _schedule_cache_refresh(nickname: str) -> None:
+    """같은 닉네임의 중복 갱신을 막고 요청 기반 갱신을 예약한다."""
+    key = nickname.casefold()
+    existing = _refresh_tasks.get(key)
+    if existing is None or existing.done():
+        _refresh_tasks[key] = asyncio.create_task(_refresh_cached_player(nickname))
+
+
 async def _load_or_auto_sync(nickname: str, force: bool = True) -> dict:
     """amae-koromo API로 플레이어 데이터를 조회한다.
     force=False이면 최신 캐시는 반환하고, 오래된 캐시는 자동 갱신한다."""
@@ -215,6 +236,11 @@ async def _load_or_auto_sync(nickname: str, force: bool = True) -> dict:
                         return cached_payload
                 except (TypeError, ValueError):
                     pass
+
+                # 일반 배지 요청은 오래된 캐시를 바로 보여 주고 데이터만 뒤에서
+                # 갱신한다. 최초 조회와 명시적 refresh 요청만 API 응답을 기다린다.
+                _schedule_cache_refresh(nickname)
+                return cached_payload
 
     try:
         summary = await fetch_summary(nickname=nickname, recent_count=10)
