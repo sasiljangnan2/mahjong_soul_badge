@@ -3,6 +3,26 @@
 amae-koromo 공개 API의 작혼 전적을 SVG 배지로 보여주는 프로젝트입니다.
 ![Mahjong Soul Badge](https://mahjongsoulbadge-production.up.railway.app/badge/Ssawaul)
 ![Mahjong Soul 3P Badge](https://mahjongsoulbadge-production.up.railway.app/badge3/Ssawaul)
+
+## 등급별 배지 디자인
+
+아래 이미지는 외부 전적 API를 호출하지 않는 고정 미리보기입니다.
+
+<table>
+  <tr>
+    <td align="center"><b>초심</b><br><img src="https://mahjongsoulbadge-production.up.railway.app/preview/novice.svg" width="360"></td>
+    <td align="center"><b>작사</b><br><img src="https://mahjongsoulbadge-production.up.railway.app/preview/adept.svg" width="360"></td>
+  </tr>
+  <tr>
+    <td align="center"><b>작걸</b><br><img src="https://mahjongsoulbadge-production.up.railway.app/preview/expert.svg" width="360"></td>
+    <td align="center"><b>작호</b><br><img src="https://mahjongsoulbadge-production.up.railway.app/preview/master.svg" width="360"></td>
+  </tr>
+  <tr>
+    <td align="center"><b>작성</b><br><img src="https://mahjongsoulbadge-production.up.railway.app/preview/saint.svg" width="360"></td>
+    <td align="center"><b>혼천</b><br><img src="https://mahjongsoulbadge-production.up.railway.app/preview/celestial.svg" width="360"></td>
+  </tr>
+</table>
+
 ## 배지 사용법
 
 아래 주소를 GitHub README에 넣고 닉네임을 바꾸면 됩니다.

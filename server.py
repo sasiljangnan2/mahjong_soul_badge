@@ -638,6 +638,39 @@ def _build_badge3_svg(profile: dict) -> str:
     )
 
 
+_PREVIEW_RANKS = {
+    "novice": (10101, 10, 1, 1, "초심 1"),
+    "adept": (10202, 500, 2, 2, "작사 2"),
+    "expert": (10303, 1267, 3, 3, "작걸 3"),
+    "master": (10401, 1448, 4, 1, "작호 1"),
+    "saint": (10502, 4200, 5, 2, "작성 2"),
+    "celestial": (10705, 1200, 6, 5, "혼천 5"),
+}
+
+
+def _build_rank_preview(rank_slug: str) -> str:
+    rank_id, score, tier, star, name_ko = _PREVIEW_RANKS[rank_slug]
+    sample_ranks = [1, 3, 2, 1, 2, 3, 2, 1, 3, 2]
+    profile = {
+        "nickname": "Sample",
+        "rank_4p": {
+            "id": rank_id,
+            "score": score,
+            "tier": tier,
+            "star": star,
+            "name_ko": name_ko,
+            "latest_grading_score": 54,
+        },
+        "recent_games": {
+            "four_player": {
+                "recent_games": [{"rank": rank, "game_category": 2} for rank in sample_ranks],
+            },
+        },
+        "stats": {},
+    }
+    return _build_badge_svg(profile)
+
+
 def _badge_response(request: Request, svg: str, updated_at: str) -> Response:
     """ETag/Last-Modified 조건부 요청을 처리하여 304 or 200 반환."""
     etag = '"' + hashlib.md5(svg.encode()).hexdigest() + '"'
@@ -694,6 +727,15 @@ async def get_badge3_short(request: Request, nickname: str, refresh: bool = Quer
     profile = _build_public_profile(payload)
     svg = _build_badge3_svg(profile)
     return _badge_response(request, svg, payload.get("updated_at", ""))
+
+
+@app.get("/preview/{rank_slug}.svg")
+async def get_rank_preview(request: Request, rank_slug: str):
+    """README용 고정 등급 배지. 외부 API를 호출하지 않는다."""
+    if rank_slug not in _PREVIEW_RANKS:
+        raise HTTPException(status_code=404, detail="Unknown preview rank")
+    svg = _build_rank_preview(rank_slug)
+    return _badge_response(request, svg, "2026-01-01T00:00:00+00:00")
 
 
 # --- 디버그: 저장된 raw 데이터 확인 ---
