@@ -11,9 +11,10 @@ from datetime import datetime, timezone
 
 import aiohttp
 
-# 4P: 5-data.amae-koromo.com / 3P: ak-data-1.sapk.ch
+# 4P와 3P 모두 같은 현재 amae-koromo 미러를 사용한다.
+# 발급된 Bearer token은 이 호스트의 보호된 player_records에 적용된다.
 _BASE4 = "https://5-data.amae-koromo.com/api/v2/pl4"
-_BASE3 = "https://ak-data-1.sapk.ch/api/v2/pl3"
+_BASE3 = "https://5-data.amae-koromo.com/api/v2/pl3"
 
 # amae-koromo 가 다루는 4P 등급전 모드 ID (金の間 동/서, 玉の間 동/서, 王座の間 동/서)
 _MODES_4P = "9,8,12,11,16,15"
