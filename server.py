@@ -352,8 +352,10 @@ def _avatar_icon_data_uri(avatar_id: int) -> str:
 
 
 # 배지 렌더링 상수
-MAX_BADGE_WIDTH = 380
-MAX_BADGE_HEIGHT = 185
+MAX_BADGE_WIDTH = 400
+MAX_BADGE_HEIGHT = 105
+BADGE_VIEW_WIDTH = 600
+BADGE_VIEW_HEIGHT = 158
 
 def _build_badge_svg_mode(
     profile: dict,
@@ -373,54 +375,54 @@ def _build_badge_svg_mode(
 
     _themes = {
         1: {
-            "bg_start": "#4a7a20", "bg_end": "#a8d850",
-            "panel": "rgba(210, 245, 180, 0.20)",
-            "line_start": "#d8f890", "line_end": "#f0ffdc",
+            "bg_start": "#071408", "bg_end": "#10230b",
+            "panel": "rgba(130, 205, 55, 0.08)",
+            "line_start": "#a9ef54", "line_end": "#79c92f",
         },
         2: {
-            "bg_start": "#1a6630", "bg_end": "#3aaa5a",
-            "panel": "rgba(190, 240, 210, 0.20)",
-            "line_start": "#80e8a8", "line_end": "#d0fce0",
+            "bg_start": "#041411", "bg_end": "#08251d",
+            "panel": "rgba(62, 224, 164, 0.08)",
+            "line_start": "#58efbd", "line_end": "#24b987",
         },
         3: {
-            "bg_start": "#a67a00", "bg_end": "#f5c842",
-            "panel": "rgba(255, 243, 201, 0.22)",
-            "line_start": "#ffe28a", "line_end": "#fff7d6",
+            "bg_start": "#151208", "bg_end": "#211a08",
+            "panel": "rgba(244, 190, 55, 0.08)",
+            "line_start": "#ffd35b", "line_end": "#d89a20",
         },
         4: {
-            "bg_start": "#a14a12", "bg_end": "#f08b3a",
-            "panel": "rgba(255, 229, 204, 0.22)",
-            "line_start": "#ffc28a", "line_end": "#ffe9d6",
+            "bg_start": "#160b06", "bg_end": "#261007",
+            "panel": "rgba(243, 111, 49, 0.09)",
+            "line_start": "#ff8b45", "line_end": "#d95721",
         },
         5: {
-            "bg_start": "#7f2050", "bg_end": "#d96090",
-            "panel": "rgba(255, 210, 230, 0.20)",
-            "line_start": "#ffaad0", "line_end": "#ffe4ef",
+            "bg_start": "#16070c", "bg_end": "#290812",
+            "panel": "rgba(241, 49, 91, 0.09)",
+            "line_start": "#ff6686", "line_end": "#e51e50",
         },
         6: {
-            "bg_start": "#3a2080", "bg_end": "#8860d0",
-            "panel": "rgba(220, 200, 255, 0.20)",
-            "line_start": "#c8a8ff", "line_end": "#ede0ff",
+            "bg_start": "#0a0a1a", "bg_end": "#151039",
+            "panel": "rgba(124, 111, 255, 0.10)",
+            "line_start": "#86a6ff", "line_end": "#9273ff",
         },
     }
     theme = _themes.get(tier, {
-        "bg_start": "#1f7348", "bg_end": "#3b9c62",
-        "panel": "rgba(255,255,255,0.16)",
-        "line_start": "#fff1a8", "line_end": "#ffffff",
+        "bg_start": "#0b1010", "bg_end": "#141b1a",
+        "panel": "rgba(255,255,255,0.06)",
+        "line_start": "#d9e3df", "line_end": "#ffffff",
     })
 
     # ── 별 ──────────────────────────────────────────────────────────
     visible_stars = min(max(star, 0), 3)
     stars_svg = ""
     star_width = 16
-    total_star_w = visible_stars * star_width
-    # 닉네임 아래 왼쪽 정렬
-    star_x0 = 16
-    for i in range(visible_stars):
+    # 등급 오른쪽에 항상 3칸을 표시하고, 미획득 별은 회색으로 채운다.
+    star_x0 = 108
+    for i in range(3):
         delay = 1.1 + i * 0.15
         sx = star_x0 + i * star_width + star_width / 2
+        star_color = "#ffd65c" if i < visible_stars else "#626863"
         stars_svg += (
-            f"<text x='{sx:.1f}' y='90' fill='#fff4c5' font-size='16' "
+            f"<text x='{sx:.1f}' y='50' fill='{star_color}' font-size='16' "
             f"text-anchor='middle' font-family='Segoe UI, Malgun Gothic, sans-serif' opacity='0'>"
             f"★<animate attributeName='opacity' from='0' to='1' dur='0.2s' begin='{delay}s' fill='freeze'/></text>"
         )
@@ -432,21 +434,39 @@ def _build_badge_svg_mode(
     except (ValueError, TypeError):
         pass
 
+    latest_delta = 0
+    try:
+        latest_delta = int(rank_data.get("latest_grading_score") or 0)
+    except (ValueError, TypeError):
+        pass
+
+    if latest_delta > 0:
+        delta_text = f"▲ +{latest_delta}"
+        delta_color = "#67e89a"
+    elif latest_delta < 0:
+        delta_text = f"▼ {latest_delta}"
+        delta_color = "#ff7181"
+    else:
+        delta_text = "― 0"
+        delta_color = "#8f9893"
+
     score_range = _RANK_SCORE_RANGES.get((tier, star))
     gauge_svg = ""
     if score_range:
         _, cap_score = score_range
         span = cap_score
-        gx, gy, gw, gh = 16, 94, 220, 11
+        gx, gy, gw, gh = 205, 39, 220, 10
         fill_w = max(0.0, gw * max(0.0, min(1.0, score_int / span))) if span > 0 else gw
         gauge_color = theme["line_start"]
         gauge_svg = (
-            f"<rect x='{gx}' y='{gy}' width='{gw}' height='{gh}' rx='4' fill='rgba(255,255,255,0.22)'/>"
+            f"<rect x='{gx}' y='{gy}' width='{gw}' height='{gh}' rx='5' fill='rgba(255,255,255,0.10)' stroke='rgba(255,255,255,0.22)' stroke-width='0.7'/>"
             f"<rect x='{gx}' y='{gy}' width='0' height='{gh}' rx='4' fill='{gauge_color}' fill-opacity='0.85'>"
             f"<animate attributeName='width' from='0' to='{fill_w:.1f}' dur='0.8s' begin='1.1s' fill='freeze'/>"
             f"</rect>"
-            f"<text x='{gx + gw // 2}' y='{gy - 4}' text-anchor='middle' fill='rgba(234,255,242,0.88)' font-size='13' "
+            f"<text x='{gx}' y='{gy - 8}' text-anchor='start' fill='{theme['line_start']}' font-size='15' font-weight='700' "
             f"font-family='Segoe UI, Malgun Gothic, sans-serif'>{score_int}/{cap_score}</text>"
+            f"<text x='{gx + gw}' y='{gy - 8}' text-anchor='end' fill='{delta_color}' font-size='13' font-weight='700' "
+            f"font-family='Segoe UI, Malgun Gothic, sans-serif'>{delta_text}</text>"
         )
 
     # ── 최근 게임 ────────────────────────────────────────────────────
@@ -474,10 +494,10 @@ def _build_badge_svg_mode(
     rank_rates = stats_data.get("rank_rates") or []
 
     # ── 차트 ─────────────────────────────────────────────────────────
-    chart_x = 40
-    chart_y = 118
-    chart_w = 320
-    chart_h = 52
+    chart_x = 44
+    chart_y = 78
+    chart_w = 390
+    chart_h = 62
 
     polyline = ""
     rank_grid_lines = ""
@@ -531,7 +551,7 @@ def _build_badge_svg_mode(
             f"fill='rgba(234,255,242,0.9)' font-size='12' font-family='Segoe UI, Malgun Gothic, sans-serif'>{escape(avg_text)}</text>"
         )
 
-    return f"""<svg xmlns='http://www.w3.org/2000/svg' width='{MAX_BADGE_WIDTH}' height='{MAX_BADGE_HEIGHT}' role='img' aria-label='Majsoul profile badge'>
+    return f"""<svg xmlns='http://www.w3.org/2000/svg' width='{MAX_BADGE_WIDTH}' height='{MAX_BADGE_HEIGHT}' viewBox='0 0 {BADGE_VIEW_WIDTH} {BADGE_VIEW_HEIGHT}' role='img' aria-label='Majsoul profile badge'>
   <defs>
     <linearGradient id='g' x1='0' y1='0' x2='1' y2='1'>
       <stop offset='0%' stop-color='{theme["bg_start"]}'/>
@@ -542,13 +562,17 @@ def _build_badge_svg_mode(
       <stop offset='100%' stop-color='{theme["line_end"]}'/>
     </linearGradient>
   </defs>
-  <rect width='{MAX_BADGE_WIDTH}' height='{MAX_BADGE_HEIGHT}' rx='16' fill='url(#g)'/>
-  <rect x='8' y='8' width='{MAX_BADGE_WIDTH - 16}' height='{MAX_BADGE_HEIGHT - 16}' rx='12' fill='{theme["panel"]}'/>
+  <rect width='{BADGE_VIEW_WIDTH}' height='{BADGE_VIEW_HEIGHT}' rx='14' fill='url(#g)'/>
+  <rect x='1.5' y='1.5' width='{BADGE_VIEW_WIDTH - 3}' height='{BADGE_VIEW_HEIGHT - 3}' rx='13' fill='none' stroke='{theme["line_start"]}' stroke-width='2'/>
+  <rect x='8' y='8' width='177' height='55' rx='10' fill='{theme["panel"]}' stroke='{theme["line_start"]}' stroke-opacity='0.28'/>
+  <rect x='190' y='8' width='255' height='55' rx='10' fill='rgba(0,0,0,0.16)' stroke='{theme["line_start"]}' stroke-opacity='0.22'/>
+  <rect x='450' y='8' width='142' height='142' rx='11' fill='rgba(0,0,0,0.20)' stroke='{theme["line_start"]}' stroke-opacity='0.24'/>
   <!-- Profile Section -->
   <g opacity='0'>
     <animate attributeName='opacity' from='0' to='1' dur='0.5s' begin='0s' fill='freeze'/>
-    <text x='55' y='45' fill='#ffffff' font-size='32' font-family='Segoe UI, Malgun Gothic, sans-serif' font-weight='700'>{nickname}</text>
-    <text x='55' y='62' fill='#eafff2' font-size='16' font-family='Segoe UI, Malgun Gothic, sans-serif'>{escape(subtitle1)}</text>
+    <rect x='8' y='8' width='5' height='55' rx='2.5' fill='{theme["line_start"]}'/>
+    <text x='24' y='33' fill='#ffffff' font-size='22' font-family='Segoe UI, Malgun Gothic, sans-serif' font-weight='700'>{nickname}</text>
+    <text x='24' y='51' fill='{theme["line_start"]}' font-size='14' font-family='Segoe UI, Malgun Gothic, sans-serif' font-weight='600'>{escape(subtitle1)}</text>
   </g>
   <!-- Stars -->
   {stars_svg}
@@ -560,13 +584,12 @@ def _build_badge_svg_mode(
   <!-- Rank Section - Icon -->
   <g opacity='0'>
     <animate attributeName='opacity' from='0' to='1' dur='0.3s' begin='0.8s' fill='freeze'/>
-    <rect x='257' y='10' width='100' height='100' rx='14' fill='rgba(255,255,255,0.18)' stroke='rgba(255,255,255,0.45)'/>
-    <image x='260' y='13' width='94' height='94' href='{icon_data_uri}' preserveAspectRatio='xMidYMid meet'/>
+    <image x='463' y='24' width='116' height='110' href='{icon_data_uri}' preserveAspectRatio='xMidYMid meet'/>
   </g>
   <!-- Chart Section -->
   <g opacity='0'>
     <animate attributeName='opacity' from='0' to='1' dur='0.3s' begin='1s' fill='freeze'/>
-    <rect x='{chart_x}' y='{chart_y}' width='{chart_w}' height='{chart_h}' rx='8' fill='rgba(255,255,255,0.14)'/>
+    <rect x='8' y='68' width='437' height='82' rx='10' fill='rgba(0,0,0,0.20)' stroke='{theme["line_start"]}' stroke-opacity='0.22'/>
     {rank_grid_lines}
     {rank_labels}
     {fallback_stats_svg}
