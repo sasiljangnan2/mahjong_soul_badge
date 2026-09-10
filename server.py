@@ -352,8 +352,8 @@ def _avatar_icon_data_uri(avatar_id: int) -> str:
 
 
 # 배지 렌더링 상수
-MAX_BADGE_WIDTH = 420
-MAX_BADGE_HEIGHT = 110
+MAX_BADGE_WIDTH = 525
+MAX_BADGE_HEIGHT = 138
 BADGE_VIEW_WIDTH = 600
 BADGE_VIEW_HEIGHT = 158
 
@@ -413,11 +413,12 @@ def _build_badge_svg_mode(
 
     # ── 별 ──────────────────────────────────────────────────────────
     visible_stars = min(max(star, 0), 3)
+    star_slots = 0 if tier >= 6 else 3
     stars_svg = ""
     star_width = 16
     # 등급 오른쪽에 항상 3칸을 표시하고, 미획득 별은 회색으로 채운다.
     star_x0 = 108
-    for i in range(3):
+    for i in range(star_slots):
         delay = 1.1 + i * 0.15
         sx = star_x0 + i * star_width + star_width / 2
         star_color = "#ffd65c" if i < visible_stars else "#626863"
@@ -451,6 +452,10 @@ def _build_badge_svg_mode(
         delta_color = "#8f9893"
 
     score_range = _RANK_SCORE_RANGES.get((tier, star))
+    if tier >= 6:
+        # 혼천의 혼주(魂珠)는 API에서 100배 값으로 내려오며 2000이 다음
+        # 레벨 기준이다. 일반 단위 점수와 분리해 동일한 게이지로 표현한다.
+        score_range = (0, 2000)
     gauge_svg = ""
     if score_range:
         _, cap_score = score_range

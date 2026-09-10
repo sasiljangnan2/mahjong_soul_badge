@@ -83,7 +83,10 @@ RANK_TIER_NAMES_EN = {
 
 
 def _build_rank_info(level_id: int, score: int) -> dict:
-    tier = (level_id // 100) % 100
+    raw_tier = (level_id // 100) % 100
+    # amae-koromo에서 혼천은 10701~10720 형식이다. 배지 내부의
+    # tier 6(혼천) 테마/아이콘에 연결하고 끝 두 자리는 혼천 레벨로 쓴다.
+    tier = 6 if raw_tier >= 6 else raw_tier
     star = level_id % 100
     tier_name_ko = RANK_TIER_NAMES_KO.get(tier, "미확인")
     tier_name_en = RANK_TIER_NAMES_EN.get(tier, "Unknown")
