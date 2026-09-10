@@ -51,7 +51,6 @@
 ## 데이터 갱신
 
 - 마지막 갱신 후 5분이 지나면 다음 배지 요청에서 데이터를 새로 가져옵니다.
-- 등록된 플레이어는 기본 24시간마다 한 번씩 갱신합니다. 주기는 `SYNC_INTERVAL`로 바꿀 수 있습니다.
 - amae-koromo에서 받은 토큰은 `AMAE_API_TOKEN`에 넣습니다. 값 앞에 `Bearer`를 붙일 필요는 없습니다.
 - 요청 속도는 amae-koromo 정책에 맞춰 최대 1 QPS로 제한합니다.
 - 최근 대국을 가져오지 못하면 저장된 기록을 유지하고, 기록도 없으면 순위 통계를 표시합니다.
@@ -75,7 +74,7 @@ Railway 설정 예시:
 - Root Directory: `mahjong_soul_badge`
 - Build Command: `pip install -r requirements.txt`
 - Start Command: `uvicorn server:app --host 0.0.0.0 --port $PORT`
-- Environment Variables: `AMAE_API_TOKEN`, 필요하면 `SYNC_INTERVAL=86400`
+- Environment Variables: `AMAE_API_TOKEN`
 
 배포가 끝나면 README의 배지 주소를 자신의 Railway 도메인으로 바꿉니다.
 

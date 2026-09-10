@@ -1,11 +1,9 @@
-import asyncio
 import base64
 import hashlib
 import json
 import logging
 import mimetypes
 import os   
-from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from email.utils import formatdate
 from functools import lru_cache
@@ -72,50 +70,10 @@ _RANK_SCORE_RANGES: dict[tuple[int, int], tuple[int, int]] = {
     (5, 3): (4500, 9000),
 }
 
-SYNC_INTERVAL_SECONDS = int(os.environ.get("SYNC_INTERVAL", 86400))  # 기본 24시간
 CACHE_MAX_AGE_SECONDS = int(os.environ.get("CACHE_MAX_AGE", 300))  # 요청 시 최대 5분 캐시
 
 
-async def _background_sync_all() -> None:
-    """알려진 모든 플레이어를 SYNC_INTERVAL_SECONDS 마다 amae-koromo API로 재동기화."""
-    logger.warning("[scheduler] 백그라운드 sync 루프 시작 (간격: %ds)", SYNC_INTERVAL_SECONDS)
-    while True:
-        await asyncio.sleep(SYNC_INTERVAL_SECONDS)
-        index = _load_nickname_index()
-        if not index:
-            logger.warning("[scheduler] 동기화할 플레이어 없음")
-            continue
-        logger.warning("[scheduler] %d명 sync 시작", len(index))
-        seen: set[int] = set()
-        for nickname, account_id_val in index.items():
-            aid = int(account_id_val)
-            if aid in seen:
-                continue
-            seen.add(aid)
-            try:
-                summary = await fetch_summary(nickname=nickname, recent_count=10)
-                _save_summary(summary, aliases=[nickname])
-                logger.warning("[scheduler] ✓ %s", nickname)
-            except Exception as exc:
-                logger.warning("[scheduler] ✗ %s: %s", nickname, exc)
-            await asyncio.sleep(1)
-        logger.warning("[scheduler] 전체 sync 완료")
-
-
-@asynccontextmanager
-async def lifespan(_app):
-    task = asyncio.create_task(_background_sync_all())
-    try:
-        yield
-    finally:
-        task.cancel()
-        try:
-            await task
-        except asyncio.CancelledError:
-            pass
-
-
-app = FastAPI(title="Majsoul Badge API", version="0.1.0", lifespan=lifespan)
+app = FastAPI(title="Majsoul Badge API", version="0.1.0")
 
 app.add_middleware(
     CORSMiddleware,
